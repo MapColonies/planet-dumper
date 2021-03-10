@@ -1,0 +1,102 @@
+{{- $releaseName := .Release.Name -}}
+{{- $chartName := include "planet-dumper.name" . -}}
+{{- $cloudProviderName := include "planet-dumper.cloudProviderName" . -}}
+{{- $cloudProviderDockerRegistryUrl := include "planet-dumper.cloudProviderDockerRegistryUrl" . -}}
+{{- if .Values.enabled -}}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ $releaseName }}-{{ $chartName }}
+  labels:
+    app: {{ $chartName }}
+    component: {{ $chartName }}
+    environment: {{ include "planet-dumper.environment" . }}
+    release: {{ $releaseName }}
+    {{- include "planet-dumper.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: {{ $releaseName }}-{{ $chartName }}-cronjob
+            {{- with .Values.image }}
+            {{- if eq $cloudProviderName "azure" }}
+            image: {{ $cloudProviderDockerRegistryUrl }}/{{ .repository }}:{{ .tag }}
+            {{- else if eq $cloudProviderName "minikube" }}
+            image: {{ .repository }}:{{ .tag }}
+            {{- end }}
+            {{- end }}
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: DUMP_NAME_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: dumpNamePrefix
+            - name: POSTGRES_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: host
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: databaseName
+            - name: POSTGRES_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: port
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-secret
+                  key: password
+            {{- if .Values.env.objectStrorage.enabled }}
+            - name: ENABLE_OBJECT_STORAGE
+              value: "true"
+            - name: OBJECT_STORAGE_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: objectStorageBucketName
+            - name: OBJECT_STORAGE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: objectStorageHost
+            - name: OBJECT_STORAGE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: objectStoragePort
+            - name: OBJECT_STORAGE_PROTOCOL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-configmap
+                  key: objectStorageProtocol
+            - name: OBJECT_STORAGE_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-secret
+                  key: objectStorageAccessKey
+            - name: OBJECT_STORAGE_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $releaseName }}-{{ $chartName }}-secret
+                  key: objectStorageSecretKey
+            {{- end -}}
+            {{- if .Values.resources.enabled }}
+            resources:
+              {{- toYaml .Values.resources.value | nindent 12 }}
+            {{- end }}
+          restartPolicy: OnFailure
+{{- end -}}

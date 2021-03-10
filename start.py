@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+import os
+import sys
+import boto3
+from botocore.exceptions import ClientError, EndpointConnectionError, SSLError
+from boto3.exceptions import S3UploadFailedError
+from datetime import datetime, timezone
+
+from MapColoniesJSONLogger.logger import generate_logger
+from osmeterium.run_command import run_command_async, run_command
+
+app_name = 'planet-dumper'
+planet_dump_ng = 'planet-dump-ng'
+pg_dump = 'pg_dump'
+log = None
+pg_dump_log = None
+planet_dump_ng_log = None
+TABLE_DUMPS_PATH = '/tmp'
+NG_DUMPS_PATH = '/tmp'
+NG_DUMP_FILE_FORMAT = 'pbf'
+object_strorage_config = {}
+
+EXIT_CODES = {
+    'success': 0,
+    'general_error': 1,
+    'pg_dump_error': 100,
+    'planet-dump-ng_error': 101,
+    's3_general_error': 102,
+    's3_connection_error': 103,
+    's3_upload_error': 104,
+    's3_bucket_not_exist': 105,
+    'object_key_already_exists': 106,
+    'missing_env_arg': 107
+}
+
+DUMP_NAME_PREFIX = os.getenv('DUMP_NAME_PREFIX')
+ENABLE_OBJECT_STORAGE = os.getenv('ENABLE_OBJECT_STORAGE')
+
+class BucketDoesNotExistError(Exception):
+    pass
+
+class ObjectKeyAlreadyExists(Exception):
+    pass
+
+def load_env():
+    try:
+        if ENABLE_OBJECT_STORAGE:
+            object_strorage_config['protocol'] = os.environ['OBJECT_STORAGE_PROTOCOL']
+            object_strorage_config['host'] = os.environ['OBJECT_STORAGE_HOST']
+            object_strorage_config['port'] = os.environ['OBJECT_STORAGE_PORT']
+            object_strorage_config['access_key_id'] = os.environ['OBJECT_STORAGE_ACCESS_KEY_ID']
+            object_strorage_config['secret_access_key'] = os.environ['OBJECT_STORAGE_SECRET_ACCESS_KEY']
+            object_strorage_config['bucket_name'] = os.environ['OBJECT_STORAGE_BUCKET']
+
+        # set postgres env variables
+        os.environ['PGHOST'] = os.environ['POSTGRES_HOST']
+        os.environ['PGPORT'] = os.environ['POSTGRES_PORT']
+        os.environ['PGUSER'] = os.environ['POSTGRES_USER']
+        os.environ['PGDATABASE'] = os.environ['POSTGRES_DB']
+        os.environ['PGPASSWORD'] = os.environ['POSTGRES_PASSWORD']
+    except KeyError as missing_key:
+        log_and_exit(f'missing required environment argument {missing_key}', EXIT_CODES['missing_env_arg'])
+
+def log_and_exit(exception_message, exit_code):
+    log.error(exception_message)
+    sys.exit(exit_code)
+
+def map_subprocess_name_to_error(subprocess_name):
+    exit_code_value = 'general_error'
+    logged_message_head = 'the subprocess'
+    if subprocess_name in [pg_dump, planet_dump_ng]:
+        exit_code_value = f'{subprocess_name}_error'
+        logged_message_head = subprocess_name
+    return (EXIT_CODES[exit_code_value], logged_message_head)
+
+def subprocess_error_handler_wrapper(subprocess_name):
+    (exit_code_value, logged_message_head) = map_subprocess_name_to_error(subprocess_name)
+    def error_handler(exit_code):
+        log_and_exit(exception_message=f'{logged_message_head} raised an error: {exit_code}', exit_code=exit_code_value)
+    return error_handler
+
+def run_subprocess_command(subprocess_name, subprocess_log, *argv):
+    command_str = ' '.join((subprocess_name,) + argv)
+    run_command(command_str,
+        subprocess_log.info,
+        subprocess_log.info,
+        subprocess_error_handler_wrapper(subprocess_name),
+        (lambda: log.info(f'the subprocess {subprocess_name} finished successfully.')))
+
+def create_dump_table(dump_table_name):
+    table_dump_file_path = os.path.join(TABLE_DUMPS_PATH, dump_table_name)
+    run_subprocess_command(pg_dump, pg_dump_log, '--format=custom', f'--file={table_dump_file_path}')
+    return table_dump_file_path
+
+def create_ng_dump(table_dump_file_path, dump_ng_name):
+    ng_dump_file_path = os.path.join(NG_DUMPS_PATH, f'{dump_ng_name}.{NG_DUMP_FILE_FORMAT}')
+    run_subprocess_command(planet_dump_ng, planet_dump_ng_log, f'-p {ng_dump_file_path}', f'-f {table_dump_file_path}')
+    return ng_dump_file_path
+
+def get_current_datetime():
+    return datetime.now(tz=timezone.utc)
+
+def format_datetime(datetime):
+    return datetime.strftime(r'%Y-%m-%dT%H:%M:%SZ')
+
+def initialize_s3_client():
+    protocol = object_strorage_config['protocol']
+    host = object_strorage_config['host']
+    port = object_strorage_config['port']
+    return boto3.resource('s3', endpoint_url=f'{protocol}://{host}:{port}',
+                                aws_access_key_id=object_strorage_config['access_key_id'],
+                                aws_secret_access_key=object_strorage_config['secret_access_key'])
+
+def upload_to_s3(file_path, dump_key):
+    bucket_name = object_strorage_config['bucket_name']
+    log.info(f'starting the upload of {file_path} to s3 bucket {bucket_name} as {dump_key}')
+    try:
+        # get a client
+        s3_client = initialize_s3_client()
+
+        bucket = s3_client.Bucket(bucket_name)
+
+        # validate bucket exists
+        if not bucket in s3_client.buckets.all():
+            raise BucketDoesNotExistError(f'The specified bucket ({bucket_name}) does not exist')
+
+        # validate key does not exitst on bucket
+        objects = list(bucket.objects.filter(Prefix='dump_key'))
+        if any([obj.key == dump_key for obj in objects]):
+            raise ObjectKeyAlreadyExists(f'Object key: {dump_key} already exists on the bucket: {bucket_name}')
+
+        # upload dump
+        bucket.upload_file(file_path, dump_key)
+
+    except (EndpointConnectionError, SSLError) as connection_error:
+        log_and_exit(str(connection_error), EXIT_CODES['s3_connection_error'])
+
+    except S3UploadFailedError as upload_error:
+        log_and_exit(str(upload_error), EXIT_CODES['s3_upload_error'])
+
+    except BucketDoesNotExistError as bucket_not_exist_error:
+        log_and_exit(bucket_not_exist_error, EXIT_CODES['s3_bucket_not_exist'])
+
+    except ObjectKeyAlreadyExists as key_already_exists_error:
+        log_and_exit(key_already_exists_error, EXIT_CODES['object_key_already_exists'])
+
+    except Exception as error:
+        log_and_exit(f'failed uploading file: { file_path } into s3 bucket: {bucket_name} as {dump_key} with error: {error}', EXIT_CODES['s3_general_error'])
+
+    log.info(f'success on uploading { file_path } into s3 bucket {bucket_name}')
+
+def main():
+    log.info(f'{app_name} container started')
+
+    load_env()
+    timestamp = format_datetime(get_current_datetime())
+    dump_name = f'{DUMP_NAME_PREFIX}_{timestamp}'
+
+    # create dump_table using pg_dump
+    created_dump_table_path = create_dump_table(dump_table_name=dump_name)
+
+    # create pbf dump using planet_dump_ng
+    created_ng_dump_path = create_ng_dump(table_dump_file_path=created_dump_table_path, dump_ng_name=dump_name)
+
+    # upload to object storage
+    if ENABLE_OBJECT_STORAGE:
+        upload_to_s3(file_path=created_ng_dump_path, dump_key=dump_name)
+
+    log.info(f'{app_name} container finished job successfully')
+    exit(EXIT_CODES['success'])
+
+if __name__ == '__main__':
+    log = generate_logger(app_name, log_level='INFO', handlers=[{ 'type': 'stream', 'output': 'stderr' }])
+    pg_dump_log = generate_logger(pg_dump, log_level='INFO', handlers=[{ 'type': 'stream', 'output': 'stderr' }])
+    planet_dump_ng_log = generate_logger(planet_dump_ng, log_level='INFO', handlers=[{ 'type': 'stream', 'output': 'stderr' }])
+    main()
