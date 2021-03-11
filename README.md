@@ -19,7 +19,7 @@ Required environment variables:
 
 Optional environment variables:
 
-- `DUMP_NAME_PREFIX` - a prefix for created dump name. will be named as '<DUMP_NAME_PREFIX>_<TIMESTAMP_UTC>'
+- `DUMP_NAME_PREFIX` - a prefix for created dump name. dump will be named as `<DUMP_NAME_PREFIX>_<TIMESTAMP_UTC>`
 - `ENABLE_OBJECT_STORAGE` - flag for enabling object storage, set as 'true' for enabling any other value will be falsy
 
 Required if `ENABLE_OBJECT_STORAGE` is true:
