@@ -12,7 +12,7 @@ image:
   tag: 'v1'
 replicaCount: 1
 env:
-  dumpNamePrefix: planet_dump
+  # dumpNamePrefix: planet_dump
   db:
     host: postgresHost
     username: postgres

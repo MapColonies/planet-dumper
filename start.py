@@ -44,7 +44,7 @@ class ObjectKeyAlreadyExists(Exception):
 
 def load_env():
     try:
-        if ENABLE_OBJECT_STORAGE:
+        if ENABLE_OBJECT_STORAGE == 'true':
             object_strorage_config['protocol'] = os.environ['OBJECT_STORAGE_PROTOCOL']
             object_strorage_config['host'] = os.environ['OBJECT_STORAGE_HOST']
             object_strorage_config['port'] = os.environ['OBJECT_STORAGE_PORT']
@@ -154,7 +154,10 @@ def main():
 
     load_env()
     timestamp = format_datetime(get_current_datetime())
-    dump_name = f'{DUMP_NAME_PREFIX}_{timestamp}'
+    if DUMP_NAME_PREFIX:
+        dump_name = f'{DUMP_NAME_PREFIX}_{timestamp}'
+    else:
+        dump_name=timestamp
 
     # create dump_table using pg_dump
     created_dump_table_path = create_dump_table(dump_table_name=dump_name)
