@@ -34,25 +34,25 @@ FROM ubuntu:20.04
 ARG POSTGRESQL_VERSION=13
 ENV DEBIAN_FRONTEND=noninteractive
 
-COPY --from=builder /app/planet-dump-ng/planet-dump-ng /usr/local/bin
-
 # postgresql-client & planet-dump-ng dependencies
 RUN apt-get update \
     && apt-get install -y lsb-release \
-    libboost-filesystem-dev \
+    libxml2-dev \
     libboost-program-options-dev \
+    libboost-filesystem-dev \
     libboost-date-time-dev \
     libboost-thread-dev \
     libboost-iostreams-dev \
     libosmpbf-dev \
     wget \
-    gnupg2 \
     python3-pip \
     && apt-get clean all \
     && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
     && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && apt-get update \
-    && apt-get -y install postgresql-$POSTGRESQL_VERSION
+    && apt-get -y install postgresql-client-$POSTGRESQL_VERSION
+
+COPY --from=builder /app/planet-dump-ng/planet-dump-ng /usr/local/bin
 
 ENV workdir /app
 WORKDIR $workdir
