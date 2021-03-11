@@ -1,8 +1,7 @@
 global:
   environment: development
-  minikubeHostPath: /data
   cloudProvider:
-    name: minikube
+    name: azure
     dockerRegistryUrl: 'some_url'
 
 enabled: true

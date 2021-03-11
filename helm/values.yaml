@@ -1,6 +1,5 @@
 global:
   environment: development
-  minikubeHostPath: /data
   cloudProvider:
     name: minikube
     dockerRegistryUrl: 'some_url'
