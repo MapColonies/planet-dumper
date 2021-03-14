@@ -17,7 +17,7 @@ pg_dump_log = None
 planet_dump_ng_log = None
 TABLE_DUMPS_PATH = '/tmp'
 NG_DUMPS_PATH = '/tmp'
-NG_DUMP_FILE_FORMAT = 'pbf'
+DUMP_FILE_FORMAT = 'pbf'
 object_strorage_config = {}
 
 EXIT_CODES = {
@@ -34,7 +34,7 @@ EXIT_CODES = {
 }
 
 DUMP_NAME_PREFIX = os.getenv('DUMP_NAME_PREFIX')
-ENABLE_OBJECT_STORAGE = os.getenv('ENABLE_OBJECT_STORAGE')
+UPLOAD_TO_OBJECT_STORAGE = os.getenv('UPLOAD_TO_OBJECT_STORAGE')
 
 class BucketDoesNotExistError(Exception):
     pass
@@ -44,7 +44,7 @@ class ObjectKeyAlreadyExists(Exception):
 
 def load_env():
     try:
-        if ENABLE_OBJECT_STORAGE == 'true':
+        if UPLOAD_TO_OBJECT_STORAGE == 'true':
             object_strorage_config['protocol'] = os.environ['OBJECT_STORAGE_PROTOCOL']
             object_strorage_config['host'] = os.environ['OBJECT_STORAGE_HOST']
             object_strorage_config['port'] = os.environ['OBJECT_STORAGE_PORT']
@@ -93,7 +93,7 @@ def create_dump_table(dump_table_name):
     return table_dump_file_path
 
 def create_ng_dump(table_dump_file_path, dump_ng_name):
-    ng_dump_file_path = os.path.join(NG_DUMPS_PATH, f'{dump_ng_name}.{NG_DUMP_FILE_FORMAT}')
+    ng_dump_file_path = os.path.join(NG_DUMPS_PATH, f'{dump_ng_name}')
     run_subprocess_command(planet_dump_ng, planet_dump_ng_log, f'-p {ng_dump_file_path}', f'-f {table_dump_file_path}')
     return ng_dump_file_path
 
@@ -125,7 +125,7 @@ def upload_to_s3(file_path, dump_key):
             raise BucketDoesNotExistError(f'The specified bucket ({bucket_name}) does not exist')
 
         # validate key does not exitst on bucket
-        objects = list(bucket.objects.filter(Prefix='dump_key'))
+        objects = list(bucket.objects.filter(Prefix=dump_key))
         if any([obj.key == dump_key for obj in objects]):
             raise ObjectKeyAlreadyExists(f'Object key: {dump_key} already exists on the bucket: {bucket_name}')
 
@@ -159,15 +159,17 @@ def main():
     else:
         dump_name=timestamp
 
+    dump_name_with_file_format = f'{dump_name}.{DUMP_FILE_FORMAT}'
+
     # create dump_table using pg_dump
     created_dump_table_path = create_dump_table(dump_table_name=dump_name)
 
     # create pbf dump using planet_dump_ng
-    created_ng_dump_path = create_ng_dump(table_dump_file_path=created_dump_table_path, dump_ng_name=dump_name)
+    created_ng_dump_path = create_ng_dump(table_dump_file_path=created_dump_table_path, dump_ng_name=dump_name_with_file_format)
 
     # upload to object storage
-    if ENABLE_OBJECT_STORAGE:
-        upload_to_s3(file_path=created_ng_dump_path, dump_key=dump_name)
+    if UPLOAD_TO_OBJECT_STORAGE == 'true':
+        upload_to_s3(file_path=created_ng_dump_path, dump_key=dump_name_with_file_format)
 
     log.info(f'{app_name} container finished job successfully')
     exit(EXIT_CODES['success'])

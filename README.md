@@ -1,5 +1,5 @@
 # planet-dumper
-This container is responsible for creating an osm dump file (pbf format) representing the current "planet" of an openstreetmap database meaning all osm related data: elements, changesets, users, etc and uploading it to a an object storage.
+This container is responsible for creating an osm dump file (pbf format) representing the current "planet" of an openstreetmap database, meaning a snapshot of all the osm elements in a current time. the dump will be uploaded to a s3 based object storage if configured so.
 
 This is accomplished by using the [planet-dump-ng](https://github.com/zerebubuth/planet-dump-ng) tool against a postgres backup file created with [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html).
 
@@ -19,10 +19,10 @@ Required environment variables:
 
 Optional environment variables:
 
-- `DUMP_NAME_PREFIX` - a prefix for created dump name. dump will be named as `<DUMP_NAME_PREFIX>_<TIMESTAMP_UTC>`
-- `ENABLE_OBJECT_STORAGE` - flag for enabling object storage, set as 'true' for enabling any other value will be falsy
+- `DUMP_NAME_PREFIX` - a prefix for the created dump name. dump will be named as `<DUMP_NAME_PREFIX>_<TIMESTAMP_UTC>.pbf`
+- `UPLOAD_TO_OBJECT_STORAGE` - flag for enabling object storage, set as 'true' for enabling any other value will be falsy
 
-Required if `ENABLE_OBJECT_STORAGE` is true:
+Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 
 - `OBJECT_STORAGE_HOST` - Object Storage's host
 - `OBJECT_STORAGE_PORT` - Object Storage's port
@@ -51,15 +51,15 @@ For additional info on given errors read the stderr output stream
 ## Building and Running
 
 ### Build argument variables
-- `PLANET_DUMP_NG_VERSION` - the version of planet-dump-ng, by default version 1.2.0
+- `PLANET_DUMP_NG_VERSION` - the version of planet-dump-ng, by default v1.2.0
 - `POSTGRESQL_VERSION` - the version of postgresql-client to be installed, by default version 13.
-notice that the postgresql-client version should be determined by your postgresql database version.
+notice that the postgresql-client version should be determined by your postgresql database version, support is only for versions 12 and 13 of postgres.
 
 ### Building the container
 
 ```
     docker build \
-    --build-arg PLANET_DUMP_NG_VERSION=1.2.0 \
+    --build-arg PLANET_DUMP_NG_VERSION=v1.2.0 \
     --build-arg POSTGRESQL_VERSION=12 \
     -f ./Dockerfile -t planet-dumper:v1 .
 ```

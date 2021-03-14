@@ -1,33 +1,37 @@
 global:
-  environment: development
-  cloudProvider:
-    name: azure
-    dockerRegistryUrl: 'some_url'
+  cloudProvider: {}
+  # environment: development
+  # cloudProvider:
+  #   name: minikube
+  #   dockerRegistryUrl: 'some_url'
+
+environment: development
+cloudProvider:
+  name: azure
+  dockerRegistryUrl: 'some_url'
 
 enabled: true
-enableInternalObjectStorage: true
-schedule: '*/1 * * * *'
+schedule: '* */1 * * *'
 image:
   repository: 'planet-dumper'
   tag: 'v1'
 replicaCount: 1
-env:
-  dumpNamePrefix: planet_dump
-  db:
-    host: postgresHost
-    username: postgres
-    password: '1234'
-    database: openstreetmap
-    port: 5432
-  objectStrorage:
-    enabled: true
-    value:
-      host: hostName
-      port: 9000
-      protocol: http
-      accessKey: accessKey
-      secretKey: secretKey
-      bucketName: dumps
+dbConfig:
+  host: potgresHost
+  username: postgres
+  password: '1234'
+  database: openstreetmap
+  port: 5432
+objectStrorageConfig:
+  enabled: true
+  enableInternal: false
+  host: s3Host
+  port: 9000
+  protocol: http
+  accessKey: accessKey
+  secretKey: secretKey
+  bucketName: dumps
+dumpNamePrefix: 'planet-dump'
 resources:
   enabled: false
   value:
@@ -41,9 +45,9 @@ resources:
 #internal object storage
 minio:
   accessKey:
-    password: accessKey
+    password: internalAccessKey
   secretKey:
-    password: secretKey
+    password: internalSecretKey
   service:
     type: NodePort
   defaultBuckets: dumps

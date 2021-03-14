@@ -6,20 +6,23 @@ kind: ConfigMap
 metadata:
   name: {{ $releaseName }}-{{ $chartName }}-configmap
 data:
-  {{- with .Values.env }}
-  dumpNamePrefix: {{ .dumpNamePrefix | default "" | quote }}
-  host: {{ .db.host }}
-  databaseName: {{ .db.database }}
-  port: {{ .db.port | quote }}
-  {{- if .objectStrorage.enabled }}
-  {{- if $.Values.enableInternalObjectStorage }}
-  objectStorageHost: {{ $releaseName }}-minio
+  {{- with .Values }}
+  DUMP_NAME_PREFIX: {{ .dumpNamePrefix | default "" | quote }}
+  POSTGRES_HOST: {{ .dbConfig.host }}
+  POSTGRES_DB: {{ .dbConfig.database }}
+  POSTGRES_PORT: {{ .dbConfig.port | quote }}
+  {{- if .objectStrorageConfig.enabled }}
+  {{- if .objectStrorageConfig.enableInternal }}
+  OBJECT_STORAGE_HOST: {{ $releaseName }}-minio
   {{- else }}
-  objectStorageHost: {{ .objectStrorage.value.host }}
+  OBJECT_STORAGE_HOST: {{ .objectStrorageConfig.host }}
   {{- end }}
+  UPLOAD_TO_OBJECT_STORAGE: {{ "true" | quote }}
+  OBJECT_STORAGE_PORT: {{ .objectStrorageConfig.port | quote }}
+  OBJECT_STORAGE_PROTOCOL: {{ .objectStrorageConfig.protocol }}
+  OBJECT_STORAGE_BUCKET: {{ .objectStrorageConfig.bucketName }}
+  {{- else }}
+  UPLOAD_TO_OBJECT_STORAGE: {{ "false" | quote }}
   {{- end }}
-  objectStoragePort: {{ .objectStrorage.value.port | quote }}
-  objectStorageProtocol: {{ .objectStrorage.value.protocol }}
-  objectStorageBucketName: {{ .objectStrorage.value.bucketName }}
   {{- end -}}
 {{- end -}}

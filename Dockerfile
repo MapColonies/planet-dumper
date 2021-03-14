@@ -1,5 +1,5 @@
 FROM ubuntu:20.04 AS builder
-ARG PLANET_DUMP_NG_VERSION=1.2.0
+ARG PLANET_DUMP_NG_VERSION=v1.2.0
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /app
 
@@ -21,10 +21,10 @@ RUN apt-get update \
     pkg-config \
     curl
 
-RUN curl -L -o planet-dump-ng.tgz "https://github.com/zerebubuth/planet-dump-ng/archive/v$PLANET_DUMP_NG_VERSION.tar.gz" \
-  && tar xzf planet-dump-ng.tgz \
+RUN curl -L -o planet-dump-ng.tgz "https://github.com/zerebubuth/planet-dump-ng/archive/$PLANET_DUMP_NG_VERSION.tar.gz" \
+  && mkdir -p planet-dump-ng \
+  && tar xzf planet-dump-ng.tgz -C planet-dump-ng --strip-components=1 \
   && rm -f planet-dump-ng.tgz \
-  && mv planet-dump-ng-$PLANET_DUMP_NG_VERSION planet-dump-ng \
   && cd planet-dump-ng \
   && ./autogen.sh \
   && ./configure \
