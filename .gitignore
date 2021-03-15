@@ -1,0 +1,9 @@
+helm/myvalues.yaml
+
+.vscode
+
+*.tgz
+**.tgz
+
+# pyenv
+.python-version

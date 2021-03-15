@@ -1,0 +1,42 @@
+{{- $releaseName := .Release.Name -}}
+{{- $chartName := include "planet-dumper.name" . -}}
+{{- $cloudProviderName := include "planet-dumper.cloudProviderName" . -}}
+{{- $cloudProviderDockerRegistryUrl := include "planet-dumper.cloudProviderDockerRegistryUrl" . -}}
+{{- if .Values.enabled -}}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ $releaseName }}-{{ $chartName }}
+  labels:
+    app: {{ $chartName }}
+    component: {{ $chartName }}
+    environment: {{ include "planet-dumper.environment" . }}
+    release: {{ $releaseName }}
+    {{- include "planet-dumper.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: {{ $releaseName }}-{{ $chartName }}-cronjob
+            {{- with .Values.image }}
+            {{- if eq $cloudProviderName "azure" }}
+            image: {{ $cloudProviderDockerRegistryUrl }}/{{ .repository }}:{{ .tag }}
+            {{- else if eq $cloudProviderName "minikube" }}
+            image: {{ .repository }}:{{ .tag }}
+            {{- end }}
+            {{- end }}
+            imagePullPolicy: IfNotPresent
+            envFrom:
+            - configMapRef:
+                name: {{ $releaseName }}-{{ $chartName }}-configmap
+            - secretRef:
+                name: {{ $releaseName }}-{{ $chartName }}-secret
+            {{- if .Values.resources.enabled }}
+            resources:
+              {{- toYaml .Values.resources.value | nindent 12 }}
+            {{- end }}
+          restartPolicy: OnFailure
+{{- end -}}

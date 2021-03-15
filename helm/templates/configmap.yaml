@@ -1,0 +1,28 @@
+{{- $releaseName := .Release.Name -}}
+{{- $chartName := include "planet-dumper.name" . -}}
+{{- if .Values.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $releaseName }}-{{ $chartName }}-configmap
+data:
+  {{- with .Values }}
+  DUMP_NAME_PREFIX: {{ .dumpNamePrefix | default "" | quote }}
+  POSTGRES_HOST: {{ .dbConfig.host }}
+  POSTGRES_DB: {{ .dbConfig.database }}
+  POSTGRES_PORT: {{ .dbConfig.port | quote }}
+  {{- if .objectStrorageConfig.enabled }}
+  {{- if .objectStrorageConfig.enableInternal }}
+  OBJECT_STORAGE_HOST: {{ $releaseName }}-minio
+  {{- else }}
+  OBJECT_STORAGE_HOST: {{ .objectStrorageConfig.host }}
+  {{- end }}
+  UPLOAD_TO_OBJECT_STORAGE: {{ "true" | quote }}
+  OBJECT_STORAGE_PORT: {{ .objectStrorageConfig.port | quote }}
+  OBJECT_STORAGE_PROTOCOL: {{ .objectStrorageConfig.protocol }}
+  OBJECT_STORAGE_BUCKET: {{ .objectStrorageConfig.bucketName }}
+  {{- else }}
+  UPLOAD_TO_OBJECT_STORAGE: {{ "false" | quote }}
+  {{- end }}
+  {{- end -}}
+{{- end -}}
