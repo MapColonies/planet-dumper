@@ -1,5 +1,7 @@
 global:
-  cloudProvider: {}
+  cloudProvider:
+    name: azure
+    dockerRegistryUrl: 'some_url'
 
 enabled: true
 schedule: '* */1 * * *'
