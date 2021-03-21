@@ -44,18 +44,20 @@ Required if `UPLOAD_TO_DUMP_SERVER` is true:
 
 *Exit codes mapping:*
 
-    - success: 0 - the program finished successfuly.
-    - general_error: 1 - catchall for general errors.
-    - pg_dump_error: 100 - the program threw an exception raised by pg_dump.
-    - planet-dump-ng_error: 101 - the program threw an exception raised by planet-dump-ng.
-    - s3_general_error: 102 - the program threw a general exception raised in the process of uploading to s3.
-    - s3_connection_error: 103 - s3 connection error occurred.
-    - s3_upload_error: 104 - s3 upload failed.
-    - s3_bucket_not_exist: 105 - the given bucket name does not exist on the object storage.
-    - object_key_already_exists: 106 - the created dump has an object key which does already exist on the bucket.
-    - missing_env_arg: 107 - missing a required environment argument.
-    - dump_server_upload_error: 108 - an error occurred in the process of uploading metadata to the dump-server.
-    - dump_server_request_error: 109 - an error occurred in the process of sending the request to the dump-server.
+| Exit Code Number | Name                      | Meaning                                                                         |
+|------------------|---------------------------|---------------------------------------------------------------------------------|
+| 0                | success                   | the program finished successfuly.                                               |
+| 1                | general error             | catchall for general errors.                                                    |
+| 100              | pg-dump error             | the program threw an exception raised by pg_dump.                               |
+| 101              | planet-dump-ng error      | the program threw an exception raised by planet-dump-ng.                        |
+| 102              | s3 general error          | the program threw a general exception raised in the process of uploading to s3. |
+| 103              | s3 connection error       | s3 connection error occurred.                                                   |
+| 104              | s3 upload error           | s3 upload failed.                                                               |
+| 105              | s3 bucket not exist       | the given bucket name does not exist on the object storage.                     |
+| 106              | object key already exists | the created dump has an object key which does already exist on the bucket.      |
+| 107              | missing env arg           | missing a required environment argument.                                        |
+| 108              | dump server upload error  | an error occurred in the process of uploading metadata to the dump-server.      |
+| 109              | dump server request error | an error occurred in the process of sending the request to the dump-server.     |
 
 For additional info on given errors read the stderr output stream
 
