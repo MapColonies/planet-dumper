@@ -2,6 +2,8 @@
 import os
 import sys
 import boto3
+import requests
+import json
 from botocore.exceptions import ClientError, EndpointConnectionError, SSLError
 from boto3.exceptions import S3UploadFailedError
 from datetime import datetime, timezone
@@ -19,6 +21,7 @@ TABLE_DUMPS_PATH = '/tmp'
 NG_DUMPS_PATH = '/tmp'
 DUMP_FILE_FORMAT = 'pbf'
 object_strorage_config = {}
+dump_server_config = {}
 
 EXIT_CODES = {
     'success': 0,
@@ -30,11 +33,14 @@ EXIT_CODES = {
     's3_upload_error': 104,
     's3_bucket_not_exist': 105,
     'object_key_already_exists': 106,
-    'missing_env_arg': 107
+    'missing_env_arg': 107,
+    'dump_server_upload_error': 108,
+    'dump_server_request_error': 109
 }
 
 DUMP_NAME_PREFIX = os.getenv('DUMP_NAME_PREFIX')
 UPLOAD_TO_OBJECT_STORAGE = os.getenv('UPLOAD_TO_OBJECT_STORAGE')
+UPLOAD_TO_DUMP_SERVER = os.getenv('UPLOAD_TO_DUMP_SERVER')
 
 class BucketDoesNotExistError(Exception):
     pass
@@ -51,6 +57,13 @@ def load_env():
             object_strorage_config['access_key_id'] = os.environ['OBJECT_STORAGE_ACCESS_KEY_ID']
             object_strorage_config['secret_access_key'] = os.environ['OBJECT_STORAGE_SECRET_ACCESS_KEY']
             object_strorage_config['bucket_name'] = os.environ['OBJECT_STORAGE_BUCKET']
+
+            if UPLOAD_TO_DUMP_SERVER == 'true':
+                dump_server_config['protocol'] = os.environ['DUMP_SERVER_PROTOCOL']
+                dump_server_config['host'] = os.environ['DUMP_SERVER_HOST']
+                dump_server_config['port'] = os.environ['DUMP_SERVER_PORT']
+                dump_server_config['path'] = os.environ['DUMP_SERVER_PATH']
+                dump_server_config['token'] = os.environ['DUMP_SERVER_TOKEN']
 
         # set postgres env variables
         os.environ['PGHOST'] = os.environ['POSTGRES_HOST']
@@ -111,8 +124,14 @@ def initialize_s3_client():
                                 aws_access_key_id=object_strorage_config['access_key_id'],
                                 aws_secret_access_key=object_strorage_config['secret_access_key'])
 
-def upload_to_s3(file_path, dump_key):
-    bucket_name = object_strorage_config['bucket_name']
+def get_dump_server_url():
+    protocol = dump_server_config['protocol']
+    host = dump_server_config['host']
+    port = dump_server_config['port']
+    path = dump_server_config['path']
+    return f'{protocol}://{host}:{port}/{path}'
+
+def upload_to_s3(file_path, bucket_name, dump_key):
     log.info(f'starting the upload of {file_path} to s3 bucket {bucket_name} as {dump_key}')
     try:
         # get a client
@@ -147,7 +166,25 @@ def upload_to_s3(file_path, dump_key):
     except Exception as error:
         log_and_exit(f'failed uploading file: { file_path } into s3 bucket: {bucket_name} as {dump_key} with error: {error}', EXIT_CODES['s3_general_error'])
 
-    log.info(f'success on uploading { file_path } into s3 bucket {bucket_name}')
+    log.info(f'success on uploading file: { file_path } into s3 bucket: {bucket_name} with key: {dump_key}')
+
+def upload_to_dump_server(dump_name, bucket_name, dump_timestamp, dump_description=None):
+    dump_server_url = get_dump_server_url()
+    dump_metadata_creation_body = { 'name': dump_name, 'bucket': bucket_name, 'timestamp': dump_timestamp }
+    if (dump_description):
+        dump_metadata_creation_body['description'] = dump_description
+    try:
+        token = dump_server_config['token']
+        request = requests.post(url=dump_server_url,
+                                json=dump_metadata_creation_body,
+                                headers={'Authorization': f'Bearer {token}'})
+    except requests.exceptions.RequestException as request_exception:
+        log_and_exit(request_exception, EXIT_CODES['dump_server_request_error'])
+
+    if not request.ok:
+        log_and_exit(f'failed uploading dump metadata: {dump_name} to dump-server. status code: {request.status_code}, {request.text}',
+                    EXIT_CODES['dump_server_upload_error'])
+    log.info(f'success on uploading dump metadata: { dump_name } to dump-server')
 
 def main():
     log.info(f'{app_name} container started')
@@ -169,7 +206,10 @@ def main():
 
     # upload to object storage
     if UPLOAD_TO_OBJECT_STORAGE == 'true':
-        upload_to_s3(file_path=created_ng_dump_path, dump_key=dump_name_with_file_format)
+        bucket_name = object_strorage_config['bucket_name']
+        upload_to_s3(file_path=created_ng_dump_path, bucket_name=bucket_name, dump_key=dump_name_with_file_format)
+        if UPLOAD_TO_DUMP_SERVER == 'true':
+            upload_to_dump_server(dump_name=dump_name_with_file_format, bucket_name=bucket_name, dump_timestamp=timestamp)
 
     log.info(f'{app_name} container finished job successfully')
     exit(EXIT_CODES['success'])

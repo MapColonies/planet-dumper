@@ -19,8 +19,9 @@ Required environment variables:
 
 Optional environment variables:
 
-- `DUMP_NAME_PREFIX` - a prefix for the created dump name. dump will be named as `<DUMP_NAME_PREFIX>_<TIMESTAMP_UTC>.pbf`
+- `DUMP_NAME_PREFIX` - a prefix for the created dump name. dump will be named as `<DUMP_NAME_PREFIX>_<TIMESTAMP_UTC>.pbf` if not given it will be named as `<TIMESTAMP_UTC>.pbf`
 - `UPLOAD_TO_OBJECT_STORAGE` - flag for enabling object storage, set as 'true' for enabling any other value will be falsy
+- `UPLOAD_TO_DUMP_SERVER` - flag for enabling dump-server dump metadata uploading, set as 'true' for enabling any other value will be falsy
 
 Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 
@@ -30,6 +31,14 @@ Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 - `OBJECT_STORAGE_ACCESS_KEY_ID` - Object Storage's access key id
 - `OBJECT_STORAGE_SECRET_ACCESS_KEY` - Object Storage's secret access key
 - `OBJECT_STORAGE_BUCKET` - Object Storage's Bucket's name
+
+Required if `UPLOAD_TO_DUMP_SERVER` is true:
+
+- `DUMP_SERVER_HOST` - Dump Server's host
+- `DUMP_SERVER_PORT` - Dump Server's port
+- `DUMP_SERVER_PROTOCOL` - Dump Server's protocol
+- `DUMP_SERVER_PATH` - Dump Server's url path for posting a new dump metadata
+- `DUMP_SERVER_TOKEN` - Dump Server's secret token needed for dump metadata upload
 
 **Exit Codes:**
 
@@ -45,6 +54,8 @@ Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
     - s3_bucket_not_exist: 105 - the given bucket name does not exist on the object storage.
     - object_key_already_exists: 106 - the created dump has an object key which does already exist on the bucket.
     - missing_env_arg: 107 - missing a required environment argument.
+    - dump_server_upload_error: 108 - an error occurred in the process of uploading metadata to the dump-server.
+    - dump_server_request_error: 109 - an error occurred in the process of sending the request to the dump-server.
 
 For additional info on given errors read the stderr output stream
 
