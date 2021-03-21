@@ -1,14 +1,11 @@
 global:
-  cloudProvider:
-    name: azure
-    dockerRegistryUrl: 'some_url'
+  cloudProvider: {}
 
 enabled: true
 schedule: '* */1 * * *'
 image:
   repository: 'planet-dumper'
   tag: 'v1'
-replicaCount: 1
 dbConfig:
   host: postgresHost
   username: postgres
@@ -23,7 +20,14 @@ objectStrorageConfig:
   protocol: http
   accessKey: accessKey
   secretKey: secretKey
-  bucketName: dumps
+  bucketName: planet-dumps
+dumpServerConfig:
+  enabled: true
+  host: dumpServerHost
+  port: 8080
+  protocol: http
+  path: dumps
+  token: 'someToken'
 # dumpNamePrefix: 'planet-dump'
 resources:
   enabled: false
@@ -43,4 +47,4 @@ minio:
     password: internalSecretKey
   service:
     type: NodePort
-  defaultBuckets: dumps
+  defaultBuckets: planet-dumps

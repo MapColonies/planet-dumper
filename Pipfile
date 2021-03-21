@@ -7,6 +7,7 @@ name = "pypi"
 osmeterium = "==0.0.3"
 boto3 = "==1.17.20"
 MapColoniesJSONLogger = "==1.0.0"
+requests = "==2.25.1"
 
 [dev-packages]
 

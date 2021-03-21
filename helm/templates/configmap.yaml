@@ -7,10 +7,13 @@ metadata:
   name: {{ $releaseName }}-{{ $chartName }}-configmap
 data:
   {{- with .Values }}
+  # general
   DUMP_NAME_PREFIX: {{ .dumpNamePrefix | default "" | quote }}
+  # postgres
   POSTGRES_HOST: {{ .dbConfig.host }}
   POSTGRES_DB: {{ .dbConfig.database }}
   POSTGRES_PORT: {{ .dbConfig.port | quote }}
+  # object storage
   {{- if .objectStrorageConfig.enabled }}
   {{- if .objectStrorageConfig.enableInternal }}
   OBJECT_STORAGE_HOST: {{ $releaseName }}-minio
@@ -23,6 +26,16 @@ data:
   OBJECT_STORAGE_BUCKET: {{ .objectStrorageConfig.bucketName }}
   {{- else }}
   UPLOAD_TO_OBJECT_STORAGE: {{ "false" | quote }}
+  {{- end }}
+  # dump-server
+  {{- if .dumpServerConfig.enabled }}
+  UPLOAD_TO_DUMP_SERVER: {{ "true" | quote }}
+  DUMP_SERVER_HOST: {{ .dumpServerConfig.host }}
+  DUMP_SERVER_PORT: {{ .dumpServerConfig.port | quote }}
+  DUMP_SERVER_PROTOCOL: {{ .dumpServerConfig.protocol }}
+  DUMP_SERVER_PATH: {{ .dumpServerConfig.path }}
+  {{- else }}
+  UPLOAD_TO_DUMP_SERVER: {{ "false" | quote }}
   {{- end }}
   {{- end -}}
 {{- end -}}
