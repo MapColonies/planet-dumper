@@ -22,6 +22,7 @@ NG_DUMPS_PATH = '/tmp'
 DUMP_FILE_FORMAT = 'pbf'
 object_strorage_config = {}
 dump_server_config = {}
+postgres_config = {}
 
 EXIT_CODES = {
     'success': 0,
@@ -41,6 +42,7 @@ EXIT_CODES = {
 DUMP_NAME_PREFIX = os.getenv('DUMP_NAME_PREFIX')
 UPLOAD_TO_OBJECT_STORAGE = os.getenv('UPLOAD_TO_OBJECT_STORAGE')
 UPLOAD_TO_DUMP_SERVER = os.getenv('UPLOAD_TO_DUMP_SERVER')
+POSTGRES_ENABLE_SSL_AUTH = os.getenv('POSTGRES_ENABLE_SSL_AUTH')
 
 class BucketDoesNotExistError(Exception):
     pass
@@ -65,12 +67,20 @@ def load_env():
                 dump_server_config['path'] = os.environ['DUMP_SERVER_PATH']
                 dump_server_config['token'] = os.environ['DUMP_SERVER_TOKEN']
 
-        # set postgres env variables
-        os.environ['PGHOST'] = os.environ['POSTGRES_HOST']
-        os.environ['PGPORT'] = os.environ['POSTGRES_PORT']
-        os.environ['PGUSER'] = os.environ['POSTGRES_USER']
-        os.environ['PGDATABASE'] = os.environ['POSTGRES_DB']
-        os.environ['PGPASSWORD'] = os.environ['POSTGRES_PASSWORD']
+        if POSTGRES_ENABLE_SSL_AUTH == 'true':
+            postgres_config['host'] = os.environ['POSTGRES_HOST']
+            postgres_config['port'] = os.environ['POSTGRES_PORT']
+            postgres_config['user'] = os.environ['POSTGRES_USER']
+            postgres_config['database'] = os.environ['POSTGRES_DB']
+            postgres_config['ssl_cert'] = os.environ['POSTGRES_SSL_CERT']
+            postgres_config['ssl_key'] = os.environ['POSTGRES_SSL_KEY']
+            postgres_config['ssl_root_cert'] = os.environ['POSTGRES_SSL_ROOT_CERT']
+        else:
+            os.environ['PGHOST'] = os.environ['POSTGRES_HOST']
+            os.environ['PGPORT'] = os.environ['POSTGRES_PORT']
+            os.environ['PGUSER'] = os.environ['POSTGRES_USER']
+            os.environ['PGDATABASE'] = os.environ['POSTGRES_DB']
+            os.environ['PGPASSWORD'] = os.environ['POSTGRES_PASSWORD']
     except KeyError as missing_key:
         log_and_exit(f'missing required environment argument {missing_key}', EXIT_CODES['missing_env_arg'])
 
@@ -102,8 +112,21 @@ def run_subprocess_command(subprocess_name, subprocess_log, *argv):
 
 def create_dump_table(dump_table_name):
     table_dump_file_path = os.path.join(TABLE_DUMPS_PATH, dump_table_name)
-    run_subprocess_command(pg_dump, pg_dump_log, '--format=custom', f'--file={table_dump_file_path}')
+    args = ('--format=custom', f'--file={table_dump_file_path}')
+    if POSTGRES_ENABLE_SSL_AUTH == 'true':
+        args = args + (get_ssl_connection(), )
+    run_subprocess_command(pg_dump, pg_dump_log, ' '.join(args))
     return table_dump_file_path
+
+def get_ssl_connection():
+    host = postgres_config['host']
+    port = postgres_config['port']
+    user = postgres_config['user']
+    database = postgres_config['database']
+    ssl_cert = postgres_config['ssl_cert']
+    ssl_key = postgres_config['ssl_key']
+    ssl_root_cert = postgres_config['ssl_root_cert']
+    return f'"host={host} port={port} user={user} dbname={database} sslcert={ssl_cert} sslkey={ssl_key} sslrootcert={ssl_root_cert}"'
 
 def create_ng_dump(table_dump_file_path, dump_ng_name):
     ng_dump_file_path = os.path.join(NG_DUMPS_PATH, f'{dump_ng_name}')
@@ -188,7 +211,6 @@ def upload_to_dump_server(dump_name, bucket_name, dump_timestamp, dump_descripti
 
 def main():
     log.info(f'{app_name} container started')
-
     load_env()
     timestamp = format_datetime(get_current_datetime())
     if DUMP_NAME_PREFIX:

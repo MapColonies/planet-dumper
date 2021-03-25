@@ -21,6 +21,13 @@ dbConfig:
   password: '1234'
   database: openstreetmap
   port: 5432
+  sslAuth:
+    enabled: false
+    secretName: secret-name
+    path: '/path'
+    certFileName: name.crt
+    keyFileName: name.key
+    caFileName: name.crt
 objectStrorageConfig:
   enabled: true
   enableInternal: false
