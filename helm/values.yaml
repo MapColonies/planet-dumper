@@ -15,7 +15,7 @@ dbConfig:
   sslAuth:
     enabled: false
     secretName: secret-name
-    path: '/path'
+    path: '/.postgresql'
     certFileName: name.crt
     keyFileName: name.key
     caFileName: name.crt

@@ -14,13 +14,13 @@ data:
   POSTGRES_DB: {{ .dbConfig.database }}
   POSTGRES_PORT: {{ .dbConfig.port | quote }}
   {{- if .dbConfig.sslAuth.enabled }}
-  POSTGRES_ENABLE_SSL_AUTH: {{ "true" | quote }}
+  POSTGRES_ENABLE_SSL_AUTH: "true"
   POSTGRES_CERTIFICATES_PATH: {{ .dbConfig.sslAuth.path }}
   POSTGRES_SSL_CERT: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.certFileName }}
   POSTGRES_SSL_KEY: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.keyFileName }}
   POSTGRES_SSL_ROOT_CERT: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.caFileName }}
   {{- else }}
-  POSTGRES_ENABLE_SSL_AUTH: {{ "false" | quote }}
+  POSTGRES_ENABLE_SSL_AUTH: "false"
   {{- end }}
   # object storage
   {{- if .objectStrorageConfig.enabled }}
@@ -29,22 +29,22 @@ data:
   {{- else }}
   OBJECT_STORAGE_HOST: {{ .objectStrorageConfig.host }}
   {{- end }}
-  UPLOAD_TO_OBJECT_STORAGE: {{ "true" | quote }}
+  UPLOAD_TO_OBJECT_STORAGE: "true"
   OBJECT_STORAGE_PORT: {{ .objectStrorageConfig.port | quote }}
   OBJECT_STORAGE_PROTOCOL: {{ .objectStrorageConfig.protocol }}
   OBJECT_STORAGE_BUCKET: {{ .objectStrorageConfig.bucketName }}
   {{- else }}
-  UPLOAD_TO_OBJECT_STORAGE: {{ "false" | quote }}
+  UPLOAD_TO_OBJECT_STORAGE: "false"
   {{- end }}
   # dump-server
   {{- if .dumpServerConfig.enabled }}
-  UPLOAD_TO_DUMP_SERVER: {{ "true" | quote }}
+  UPLOAD_TO_DUMP_SERVER: "true"
   DUMP_SERVER_HOST: {{ .dumpServerConfig.host }}
   DUMP_SERVER_PORT: {{ .dumpServerConfig.port | quote }}
   DUMP_SERVER_PROTOCOL: {{ .dumpServerConfig.protocol }}
   DUMP_SERVER_PATH: {{ .dumpServerConfig.path }}
   {{- else }}
-  UPLOAD_TO_DUMP_SERVER: {{ "false" | quote }}
+  UPLOAD_TO_DUMP_SERVER: "false"
   {{- end }}
   {{- end -}}
 {{- end -}}

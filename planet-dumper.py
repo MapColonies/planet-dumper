@@ -126,7 +126,7 @@ def get_ssl_connection():
     ssl_cert = postgres_config['ssl_cert']
     ssl_key = postgres_config['ssl_key']
     ssl_root_cert = postgres_config['ssl_root_cert']
-    return f'"host={host} port={port} user={user} dbname={database}"'
+    return f'"host={host} port={port} user={user} dbname={database} sslcert={ssl_cert} sslkey={ssl_key} sslrootcert={ssl_root_cert}"'
 
 def create_ng_dump(table_dump_file_path, dump_ng_name):
     ng_dump_file_path = os.path.join(NG_DUMPS_PATH, f'{dump_ng_name}')

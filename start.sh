@@ -6,4 +6,4 @@ then
   chmod 400 $POSTGRES_CERTIFICATES_PATH/*.key
 fi
 
-python3 start.py
+python3 planet-dumper.py

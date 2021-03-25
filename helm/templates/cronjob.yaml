@@ -40,14 +40,14 @@ spec:
             {{- end }}
             {{- if .Values.dbConfig.sslAuth.enabled }}
             volumeMounts:
-              - name: ssl-conf
+              - name: cert-conf
                 mountPath: /tmp/certs
                 readOnly: true
             {{- end }}
           restartPolicy: OnFailure
           {{- if .Values.dbConfig.sslAuth.enabled }}
           volumes:
-          - name: ssl-conf
+          - name: cert-conf
             secret:
               secretName: {{ .Values.dbConfig.sslAuth.secretName }}
           {{- end }}

@@ -59,7 +59,7 @@ WORKDIR $workdir
 COPY ./requirements.txt .
 RUN pip3 install -r requirements.txt
 COPY start.sh .
-COPY start.py .
+COPY planet-dumper.py .
 
 RUN chgrp root $workdir/start.sh && chmod -R a+rwx $workdir && \
     mkdir /.postgresql && chmod g+w /.postgresql
