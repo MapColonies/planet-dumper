@@ -58,13 +58,14 @@ ENV workdir /app
 WORKDIR $workdir
 COPY ./requirements.txt .
 RUN pip3 install -r requirements.txt
+COPY start.sh .
 COPY start.py .
-RUN chmod a+x $workdir/start.py
 
+RUN chgrp root $workdir/start.sh && chmod -R a+rwx $workdir && \
+    mkdir /.postgresql && chmod g+w /.postgresql
 
 RUN useradd -ms /bin/bash user && usermod -a -G root user
-RUN chmod -R a+rwx $workdir
 
 USER user
 
-CMD ./start.py
+CMD ./start.sh

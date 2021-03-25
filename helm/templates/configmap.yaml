@@ -13,6 +13,15 @@ data:
   POSTGRES_HOST: {{ .dbConfig.host }}
   POSTGRES_DB: {{ .dbConfig.database }}
   POSTGRES_PORT: {{ .dbConfig.port | quote }}
+  {{- if .dbConfig.sslAuth.enabled }}
+  POSTGRES_ENABLE_SSL_AUTH: {{ "true" | quote }}
+  POSTGRES_CERTIFICATES_PATH: {{ .dbConfig.sslAuth.path }}
+  POSTGRES_SSL_CERT: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.certFileName }}
+  POSTGRES_SSL_KEY: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.keyFileName }}
+  POSTGRES_SSL_ROOT_CERT: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.caFileName }}
+  {{- else }}
+  POSTGRES_ENABLE_SSL_AUTH: {{ "false" | quote }}
+  {{- end }}
   # object storage
   {{- if .objectStrorageConfig.enabled }}
   {{- if .objectStrorageConfig.enableInternal }}
