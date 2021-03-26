@@ -22,6 +22,7 @@ Optional environment variables:
 - `DUMP_NAME_PREFIX` - a prefix for the created dump name. dump will be named as `<DUMP_NAME_PREFIX>_<TIMESTAMP_UTC>.pbf` if not given it will be named as `<TIMESTAMP_UTC>.pbf`
 - `UPLOAD_TO_OBJECT_STORAGE` - flag for enabling object storage, set as 'true' for enabling any other value will be falsy
 - `UPLOAD_TO_DUMP_SERVER` - flag for enabling dump-server dump metadata uploading, set as 'true' for enabling any other value will be falsy
+- `POSTGRES_ENABLE_SSL_AUTH` - flag for enabling postgres certificate, auth set as 'true' for enabling any other value will be falsy
 
 Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 
@@ -39,6 +40,12 @@ Required if `UPLOAD_TO_DUMP_SERVER` is true:
 - `DUMP_SERVER_PROTOCOL` - Dump Server's protocol
 - `DUMP_SERVER_PATH` - Dump Server's url path for posting a new dump metadata
 - `DUMP_SERVER_TOKEN` - Dump Server's secret token needed for dump metadata upload
+
+Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
+
+- `POSTGRES_SSL_CERT` - path to cert file
+- `POSTGRES_SSL_KEY` - path to cert auth kay
+- `POSTGRES_SSL_ROOT_CERT` - path to root cert
 
 **Exit Codes:**
 
