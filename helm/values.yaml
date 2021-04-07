@@ -1,8 +1,10 @@
 global:
-  environment: development
-  cloudProvider:
-    name: azure
-    dockerRegistryUrl: 'acrarolibotnonprod.azurecr.io'
+  cloudProvider: {}
+
+environment: development
+cloudProvider:
+  name: azure
+  dockerRegistryUrl: 'acrarolibotnonprod.azurecr.io'
 
 enabled: true
 schedule: '* */1 * * *'
@@ -38,7 +40,7 @@ dumpServerConfig:
   protocol: http
   path: dumps
   token: 'someToken'
-# dumpNamePrefix: 'planet-dump'
+dumpNamePrefix: ''
 resources:
   enabled: false
   value:
