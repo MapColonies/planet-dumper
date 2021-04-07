@@ -1,11 +1,14 @@
 global:
-  cloudProvider: {}
+  environment: development
+  cloudProvider:
+    name: azure
+    dockerRegistryUrl: 'acrarolibotnonprod.azurecr.io'
 
 enabled: true
 schedule: '* */1 * * *'
 image:
   repository: 'planet-dumper'
-  tag: 'v1'
+  tag: '0.0.1'
 dbConfig:
   host: postgresHost
   username: postgres
