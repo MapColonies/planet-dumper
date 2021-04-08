@@ -14,6 +14,8 @@ metadata:
     release: {{ $releaseName }}
     {{- include "planet-dumper.labels" . | nindent 4 }}
 spec:
+  failedJobsHistoryLimit: 2
+  successfulJobsHistoryLimit: 2
   schedule: {{ .Values.schedule | quote }}
   jobTemplate:
     spec:
