@@ -31,7 +31,7 @@ RUN curl -L -o planet-dump-ng.tgz "https://github.com/zerebubuth/planet-dump-ng/
   && make
 
 FROM ubuntu:20.04
-ARG POSTGRESQL_VERSION=13
+ARG POSTGRESQL_VERSION=12
 ENV DEBIAN_FRONTEND=noninteractive
 
 # postgresql-client & planet-dump-ng dependencies
