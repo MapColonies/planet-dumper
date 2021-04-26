@@ -37,6 +37,9 @@ objectStrorageConfig:
   accessKey: accessKey
   secretKey: secretKey
   bucketName: planet-dumps
+  sslAuth:
+    enabled: false
+    shouldVerify: false
 dumpServerConfig:
   enabled: true
   host: dumpServerHost

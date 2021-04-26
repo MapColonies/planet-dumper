@@ -7,3 +7,4 @@ helm/myvalues.yaml
 
 # pyenv
 .python-version
+.env

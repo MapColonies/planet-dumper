@@ -23,6 +23,8 @@ Optional environment variables:
 - `UPLOAD_TO_OBJECT_STORAGE` - flag for enabling object storage, set as 'true' for enabling any other value will be falsy
 - `UPLOAD_TO_DUMP_SERVER` - flag for enabling dump-server dump metadata uploading, set as 'true' for enabling any other value will be falsy
 - `POSTGRES_ENABLE_SSL_AUTH` - flag for enabling postgres certificate, auth set as 'true' for enabling any other value will be falsy
+- `OBJECT_STORAGE_USE_SSL` - Whether or not to use SSL, defaults to false
+- `OBJECT_STORAGE_VERIFY_ROOT_CERT` - Whether or not to verify SSL root certificate, defaults to false
 
 Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 

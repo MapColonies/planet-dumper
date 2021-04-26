@@ -33,6 +33,12 @@ data:
   OBJECT_STORAGE_PORT: {{ .objectStrorageConfig.port | quote }}
   OBJECT_STORAGE_PROTOCOL: {{ .objectStrorageConfig.protocol }}
   OBJECT_STORAGE_BUCKET: {{ .objectStrorageConfig.bucketName }}
+  {{- if .objectStrorageConfig.sslAuth.enabled }}
+  OBJECT_STORAGE_USE_SSL: "true"
+  {{- end }}
+  {{- if .objectStrorageConfig.sslAuth.shouldVerify }}
+  OBJECT_STORAGE_VERIFY_ROOT_CERT: "true"
+  {{- end }}
   {{- else }}
   UPLOAD_TO_OBJECT_STORAGE: "false"
   {{- end }}
