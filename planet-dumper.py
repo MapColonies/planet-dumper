@@ -20,7 +20,9 @@ planet_dump_ng_log = None
 TABLE_DUMPS_PATH = '/tmp'
 NG_DUMPS_PATH = '/tmp'
 DUMP_FILE_FORMAT = 'pbf'
-ROOT_CERT_PATH='/usr/local/share/ca-certificates/rootCA.crt'
+DEFAULT_CERTIFICATES_DIR='/usr/local/share/ca-certificates'
+DEFAULT_OBJECT_STORAGE_CERT_NAME='root-object-storage.crt'
+DEFAULT_DUMP_SERVER_CERT_NAME='root-dump-server.crt'
 object_strorage_config = {}
 dump_server_config = {}
 postgres_config = {}
@@ -62,7 +64,10 @@ def load_env():
             object_strorage_config['bucket_name'] = os.environ['OBJECT_STORAGE_BUCKET']
             object_strorage_config['should_use_ssl'] = os.getenv('OBJECT_STORAGE_USE_SSL', False)
             object_strorage_config['verify_root_cert'] = os.getenv('OBJECT_STORAGE_VERIFY_ROOT_CERT', False)
-            object_strorage_config['verify_root_cert_path'] = ROOT_CERT_PATH
+            if object_strorage_config['verify_root_cert'] == 'true':
+                object_storage_cert_dir = os.getenv('OBJECT_STORAGE_CERT_DIR', DEFAULT_CERTIFICATES_DIR)
+                object_storage_cert_name = os.getenv('OBJECT_STORAGE_CERT_NAME', DEFAULT_OBJECT_STORAGE_CERT_NAME)
+                object_strorage_config['verify_root_cert_path'] = os.path.join(object_storage_cert_dir, object_storage_cert_name)
 
             if UPLOAD_TO_DUMP_SERVER == 'true':
                 dump_server_config['protocol'] = os.environ['DUMP_SERVER_PROTOCOL']
@@ -70,6 +75,11 @@ def load_env():
                 dump_server_config['port'] = os.environ['DUMP_SERVER_PORT']
                 dump_server_config['path'] = os.environ['DUMP_SERVER_PATH']
                 dump_server_config['token'] = os.environ['DUMP_SERVER_TOKEN']
+                dump_server_config['verify_root_cert'] = os.getenv('DUMP_SERVER_VERIFY_ROOT_CERT', False)
+                if dump_server_config['verify_root_cert'] == 'true':
+                    dump_server_cert_dir = os.getenv('DUMP_SERVER_CERT_DIR', DEFAULT_CERTIFICATES_DIR)
+                    dump_server_cert_name = os.getenv('DUMP_SERVER_CERT_NAME', DEFAULT_DUMP_SERVER_CERT_NAME)
+                    dump_server_config['verify_root_cert_path'] = os.path.join(dump_server_cert_dir, dump_server_cert_name)
 
         if POSTGRES_ENABLE_SSL_AUTH == 'true':
             postgres_config['host'] = os.environ['POSTGRES_HOST']
@@ -148,7 +158,7 @@ def initialize_s3_client():
     host = object_strorage_config['host']
     port = object_strorage_config['port']
     verify=False
-    if object_strorage_config['verify_root_cert']:
+    if object_strorage_config['verify_root_cert'] == 'true':
         verify = object_strorage_config['verify_root_cert_path']
     return boto3.resource('s3', endpoint_url=f'{protocol}://{host}:{port}',
                                 aws_access_key_id=object_strorage_config['access_key_id'],
@@ -207,9 +217,13 @@ def upload_to_dump_server(dump_name, bucket_name, dump_timestamp, dump_descripti
         dump_metadata_creation_body['description'] = dump_description
     try:
         token = dump_server_config['token']
+        verify=False
+        if dump_server_config['verify_root_cert'] == 'true':
+            verify = dump_server_config['verify_root_cert_path']
         request = requests.post(url=dump_server_url,
                                 json=dump_metadata_creation_body,
-                                headers={'Authorization': f'Bearer {token}'})
+                                headers={'Authorization': f'Bearer {token}'},
+                                verify=verify)
     except requests.exceptions.RequestException as request_exception:
         log_and_exit(request_exception, EXIT_CODES['dump_server_request_error'])
 

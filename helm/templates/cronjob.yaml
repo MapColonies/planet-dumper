@@ -43,7 +43,7 @@ spec:
             {{- if .Values.dbConfig.sslAuth.enabled }}
             volumeMounts:
               - name: cert-conf
-                mountPath: /tmp/certs
+                mountPath: /tmp/certs-postgres
                 readOnly: true
             {{- end }}
           restartPolicy: OnFailure

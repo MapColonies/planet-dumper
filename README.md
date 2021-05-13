@@ -16,6 +16,7 @@ Required environment variables:
 - `POSTGRES_USER` - Database user
 - `POSTGRES_PASSWORD` - Database user's password
 - `POSTGRES_PORT` - Database's port
+- `SHOULD_UPDATE_CA_CERTIFICATES` - Whether to update the root certificates used by the object storage and the dump server on run time
 
 Optional environment variables:
 
@@ -25,6 +26,11 @@ Optional environment variables:
 - `POSTGRES_ENABLE_SSL_AUTH` - flag for enabling postgres certificate, auth set as 'true' for enabling any other value will be falsy
 - `OBJECT_STORAGE_USE_SSL` - Whether or not to use SSL, defaults to false
 - `OBJECT_STORAGE_VERIFY_ROOT_CERT` - Whether or not to verify SSL root certificate, defaults to false
+- `OBJECT_STORAGE_CERT_DIR` - the directory path for object storage root certificate used for verification when `OBJECT_STORAGE_VERIFY_ROOT_CERT` is true, defaults to '/usr/local/share/ca-certificates'
+- `OBJECT_STORAGE_CERT_NAME` - the name for object storage root certificate used for verification when `OBJECT_STORAGE_VERIFY_ROOT_CERT` is true, defaults to 'root-object-storage.crt'
+- `DUMP_SERVER_VERIFY_ROOT_CERT` - Whether or not to verify SSL root certificate, defaults to false
+- `DUMP_SERVER_CERT_DIR` - the directory path for dump server root certificate used for verification when `DUMP_SERVER_VERIFY_ROOT_CERT` is true, defaults to '/usr/local/share/ca-certificates'
+- `DUMP_SERVER_CERT_NAME` - the name for dump server root certificate used for verification when `DUMP_SERVER_VERIFY_ROOT_CERT` is true, defaults to 'root-dump-server.crt'
 
 Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 
