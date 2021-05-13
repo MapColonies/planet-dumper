@@ -20,6 +20,7 @@ planet_dump_ng_log = None
 TABLE_DUMPS_PATH = '/tmp'
 NG_DUMPS_PATH = '/tmp'
 DUMP_FILE_FORMAT = 'pbf'
+ROOT_CERT_PATH='/usr/local/share/ca-certificates/rootCA.crt'
 object_strorage_config = {}
 dump_server_config = {}
 postgres_config = {}
@@ -59,6 +60,9 @@ def load_env():
             object_strorage_config['access_key_id'] = os.environ['OBJECT_STORAGE_ACCESS_KEY_ID']
             object_strorage_config['secret_access_key'] = os.environ['OBJECT_STORAGE_SECRET_ACCESS_KEY']
             object_strorage_config['bucket_name'] = os.environ['OBJECT_STORAGE_BUCKET']
+            object_strorage_config['should_use_ssl'] = os.getenv('OBJECT_STORAGE_USE_SSL', False)
+            object_strorage_config['verify_root_cert'] = os.getenv('OBJECT_STORAGE_VERIFY_ROOT_CERT', False)
+            object_strorage_config['verify_root_cert_path'] = ROOT_CERT_PATH
 
             if UPLOAD_TO_DUMP_SERVER == 'true':
                 dump_server_config['protocol'] = os.environ['DUMP_SERVER_PROTOCOL']
@@ -143,9 +147,14 @@ def initialize_s3_client():
     protocol = object_strorage_config['protocol']
     host = object_strorage_config['host']
     port = object_strorage_config['port']
+    verify=False
+    if object_strorage_config['verify_root_cert']:
+        verify = object_strorage_config['verify_root_cert_path']
     return boto3.resource('s3', endpoint_url=f'{protocol}://{host}:{port}',
                                 aws_access_key_id=object_strorage_config['access_key_id'],
-                                aws_secret_access_key=object_strorage_config['secret_access_key'])
+                                aws_secret_access_key=object_strorage_config['secret_access_key'],
+                                use_ssl=object_strorage_config['should_use_ssl'],
+                                verify=verify)
 
 def get_dump_server_url():
     protocol = dump_server_config['protocol']
