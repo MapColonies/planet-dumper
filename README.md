@@ -16,6 +16,7 @@ Required environment variables:
 - `POSTGRES_USER` - Database user
 - `POSTGRES_PASSWORD` - Database user's password
 - `POSTGRES_PORT` - Database's port
+- `SHOULD_UPDATE_CA_CERTIFICATES` - Whether to update the root certificates used by the object storage and the dump server on run time
 
 Optional environment variables:
 
@@ -25,6 +26,7 @@ Optional environment variables:
 - `POSTGRES_ENABLE_SSL_AUTH` - flag for enabling postgres certificate, auth set as 'true' for enabling any other value will be falsy
 - `OBJECT_STORAGE_USE_SSL` - Whether or not to use SSL, defaults to false
 - `OBJECT_STORAGE_VERIFY_ROOT_CERT` - Whether or not to verify SSL root certificate, defaults to false
+- `DUMP_SERVER_VERIFY_ROOT_CERT` - Whether or not to verify SSL root certificate, defaults to false
 
 Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 
@@ -35,6 +37,10 @@ Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 - `OBJECT_STORAGE_SECRET_ACCESS_KEY` - Object Storage's secret access key
 - `OBJECT_STORAGE_BUCKET` - Object Storage's Bucket's name
 
+Required if `UPLOAD_TO_OBJECT_STORAGE` and `OBJECT_STORAGE_VERIFY_ROOT_CERT` are true:
+- `OBJECT_STORAGE_CERT_DIR` - the directory path for object storage root certificate used for verification when `OBJECT_STORAGE_VERIFY_ROOT_CERT` is true
+- `OBJECT_STORAGE_CERT_NAME` - the name for object storage root certificate used for verification when `OBJECT_STORAGE_VERIFY_ROOT_CERT` is true
+
 Required if `UPLOAD_TO_DUMP_SERVER` is true:
 
 - `DUMP_SERVER_HOST` - Dump Server's host
@@ -43,8 +49,13 @@ Required if `UPLOAD_TO_DUMP_SERVER` is true:
 - `DUMP_SERVER_PATH` - Dump Server's url path for posting a new dump metadata
 - `DUMP_SERVER_TOKEN` - Dump Server's secret token needed for dump metadata upload
 
+Required if `UPLOAD_TO_DUMP_SERVER` and `DUMP_SERVER_VERIFY_ROOT_CERT` are true:
+- `DUMP_SERVER_CERT_DIR` - the directory path for dump server root certificate used for verification when `DUMP_SERVER_VERIFY_ROOT_CERT` is true.
+- `DUMP_SERVER_CERT_NAME` - the name for dump server root certificate used for verification when `DUMP_SERVER_VERIFY_ROOT_CERT` is true.
+
 Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 
+- `POSTGRES_CERTS_MOUNT_PATH` - path to mounted certs
 - `POSTGRES_SSL_CERT` - path to cert file
 - `POSTGRES_SSL_KEY` - path to cert auth kay
 - `POSTGRES_SSL_ROOT_CERT` - path to root cert

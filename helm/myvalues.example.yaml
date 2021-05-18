@@ -24,7 +24,7 @@ dbConfig:
   sslAuth:
     enabled: false
     secretName: secret-name
-    path: '/path'
+    mountPath: '/path'
     certFileName: name.crt
     keyFileName: name.key
     caFileName: name.crt
@@ -40,6 +40,8 @@ objectStrorageConfig:
   sslAuth:
     enabled: false
     shouldVerify: false
+    path: '/path'
+    certFileName: 'name.crt'
 dumpServerConfig:
   enabled: true
   host: dumpServerHost
@@ -47,7 +49,12 @@ dumpServerConfig:
   protocol: http
   path: dumps
   token: 'dQw4w9WgXcQ'
+  sslAuth:
+    shouldVerify: false
+    path: '/path'
+    certFileName: 'name.crt'
 dumpNamePrefix: 'planet-dump'
+shouldUpdateCaCertificates: true
 resources:
   enabled: false
   value:
