@@ -20,7 +20,7 @@ dbConfig:
   sslAuth:
     enabled: false
     secretName: secret-name
-    path: '/.postgresql'
+    mountPath: '/tmp/certs-postgres'
     certFileName: name.crt
     keyFileName: name.key
     caFileName: name.crt
@@ -36,6 +36,8 @@ objectStrorageConfig:
   sslAuth:
     enabled: false
     shouldVerify: false
+    path: '/tmp/object-storage'
+    certFileName: name.crt
 dumpServerConfig:
   enabled: true
   host: dumpServerHost
@@ -43,7 +45,12 @@ dumpServerConfig:
   protocol: http
   path: dumps
   token: 'someToken'
+  sslAuth:
+    shouldVerify: false
+    path: '/tmp/dump-server'
+    certFileName: name.crt
 dumpNamePrefix: ''
+shouldUpdateCaCertificates: true
 resources:
   enabled: false
   value:

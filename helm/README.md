@@ -14,7 +14,7 @@ A cronjob scheduled on every interval for creating a planet dump and uploading i
 
 - `dbConfig.sslAuth.enabled` - enabling postgres certificate auth
 - `dbConfig.sslAuth.secretName` - secret name containing the certificates for `cert-conf` volume
-- `dbConfig.sslAuth.path` - the path for the certificates
+- `dbConfig.sslAuth.mountPath` - the path for the mounted certificates
 - `dbConfig.sslAuth.certFileName` - cert file name
 - `dbConfig.sslAuth.keyFileName` - cert auth key name
 - `dbConfig.sslAuth.caFileName` - root cert auth name

@@ -9,16 +9,19 @@ data:
   {{- with .Values }}
   # general
   DUMP_NAME_PREFIX: {{ .dumpNamePrefix | default "" | quote }}
+  {{- if .shouldUpdateCaCertificates }}
+  SHOULD_UPDATE_CA_CERTIFICATES: "true"
+  {{- end }}
   # postgres
   POSTGRES_HOST: {{ .dbConfig.host }}
   POSTGRES_DB: {{ .dbConfig.database }}
   POSTGRES_PORT: {{ .dbConfig.port | quote }}
   {{- if .dbConfig.sslAuth.enabled }}
   POSTGRES_ENABLE_SSL_AUTH: "true"
-  POSTGRES_CERTIFICATES_PATH: {{ .dbConfig.sslAuth.path }}
-  POSTGRES_SSL_CERT: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.certFileName }}
-  POSTGRES_SSL_KEY: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.keyFileName }}
-  POSTGRES_SSL_ROOT_CERT: {{ .dbConfig.sslAuth.path }}/{{ .dbConfig.sslAuth.caFileName }}
+  POSTGRES_CERTS_MOUNT_PATH: {{ .dbConfig.sslAuth.mountPath }}
+  POSTGRES_SSL_CERT: /.postgresql/{{ .dbConfig.sslAuth.certFileName }}
+  POSTGRES_SSL_KEY: /.postgresql/{{ .dbConfig.sslAuth.keyFileName }}
+  POSTGRES_SSL_ROOT_CERT: /.postgresql/{{ .dbConfig.sslAuth.caFileName }}
   {{- else }}
   POSTGRES_ENABLE_SSL_AUTH: "false"
   {{- end }}
@@ -38,6 +41,8 @@ data:
   {{- end }}
   {{- if .objectStrorageConfig.sslAuth.shouldVerify }}
   OBJECT_STORAGE_VERIFY_ROOT_CERT: "true"
+  OBJECT_STORAGE_CERT_DIR: {{ .objectStrorageConfig.sslAuth.path }}
+  OBJECT_STORAGE_CERT_NAME: {{ .objectStrorageConfig.sslAuth.certFileName }}
   {{- end }}
   {{- else }}
   UPLOAD_TO_OBJECT_STORAGE: "false"
@@ -49,6 +54,11 @@ data:
   DUMP_SERVER_PORT: {{ .dumpServerConfig.port | quote }}
   DUMP_SERVER_PROTOCOL: {{ .dumpServerConfig.protocol }}
   DUMP_SERVER_PATH: {{ .dumpServerConfig.path }}
+  {{- if .dumpServerConfig.sslAuth.shouldVerify }}
+  DUMP_SERVER_VERIFY_ROOT_CERT: "true"
+  DUMP_SERVER_CERT_DIR: {{ .dumpServerConfig.sslAuth.path }}
+  DUMP_SERVER_CERT_NAME: {{ .dumpServerConfig.sslAuth.certFileName }}
+  {{- end }}
   {{- else }}
   UPLOAD_TO_DUMP_SERVER: "false"
   {{- end }}
