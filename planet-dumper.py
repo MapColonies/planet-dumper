@@ -52,33 +52,33 @@ class ObjectKeyAlreadyExists(Exception):
 
 def load_env():
     try:
-        if convertStringToBool(UPLOAD_TO_OBJECT_STORAGE):
+        if convert_string_to_bool(UPLOAD_TO_OBJECT_STORAGE):
             object_strorage_config['protocol'] = os.environ['OBJECT_STORAGE_PROTOCOL']
             object_strorage_config['host'] = os.environ['OBJECT_STORAGE_HOST']
             object_strorage_config['port'] = os.environ['OBJECT_STORAGE_PORT']
             object_strorage_config['access_key_id'] = os.environ['OBJECT_STORAGE_ACCESS_KEY_ID']
             object_strorage_config['secret_access_key'] = os.environ['OBJECT_STORAGE_SECRET_ACCESS_KEY']
             object_strorage_config['bucket_name'] = os.environ['OBJECT_STORAGE_BUCKET']
-            object_strorage_config['should_use_ssl'] = convertStringToBool(os.getenv('OBJECT_STORAGE_USE_SSL'))
-            object_strorage_config['verify_root_cert'] = convertStringToBool(os.getenv('OBJECT_STORAGE_VERIFY_ROOT_CERT'))
+            object_strorage_config['should_use_ssl'] = convert_string_to_bool(os.getenv('OBJECT_STORAGE_USE_SSL'))
+            object_strorage_config['verify_root_cert'] = convert_string_to_bool(os.getenv('OBJECT_STORAGE_VERIFY_ROOT_CERT'))
             if object_strorage_config['verify_root_cert']:
                 object_storage_cert_dir = os.environ['OBJECT_STORAGE_CERT_DIR']
                 object_storage_cert_name = os.environ['OBJECT_STORAGE_CERT_NAME']
                 object_strorage_config['verify_root_cert_path'] = os.path.join(object_storage_cert_dir, object_storage_cert_name)
 
-            if convertStringToBool(UPLOAD_TO_DUMP_SERVER):
+            if convert_string_to_bool(UPLOAD_TO_DUMP_SERVER):
                 dump_server_config['protocol'] = os.environ['DUMP_SERVER_PROTOCOL']
                 dump_server_config['host'] = os.environ['DUMP_SERVER_HOST']
                 dump_server_config['port'] = os.environ['DUMP_SERVER_PORT']
                 dump_server_config['path'] = os.environ['DUMP_SERVER_PATH']
                 dump_server_config['token'] = os.environ['DUMP_SERVER_TOKEN']
-                dump_server_config['verify_root_cert'] = convertStringToBool(os.getenv('DUMP_SERVER_VERIFY_ROOT_CERT'))
+                dump_server_config['verify_root_cert'] = convert_string_to_bool(os.getenv('DUMP_SERVER_VERIFY_ROOT_CERT'))
                 if dump_server_config['verify_root_cert']:
                     dump_server_cert_dir = os.environ['DUMP_SERVER_CERT_DIR']
                     dump_server_cert_name = os.environ['DUMP_SERVER_CERT_NAME']
                     dump_server_config['verify_root_cert_path'] = os.path.join(dump_server_cert_dir, dump_server_cert_name)
 
-        if convertStringToBool(POSTGRES_ENABLE_SSL_AUTH):
+        if convert_string_to_bool(POSTGRES_ENABLE_SSL_AUTH):
             postgres_config['host'] = os.environ['POSTGRES_HOST']
             postgres_config['port'] = os.environ['POSTGRES_PORT']
             postgres_config['user'] = os.environ['POSTGRES_USER']
@@ -124,7 +124,7 @@ def run_subprocess_command(subprocess_name, subprocess_log, *argv):
 def create_dump_table(dump_table_name):
     table_dump_file_path = os.path.join(TABLE_DUMPS_PATH, dump_table_name)
     args = ('--format=custom', f'--file={table_dump_file_path}')
-    if convertStringToBool(POSTGRES_ENABLE_SSL_AUTH):
+    if convert_string_to_bool(POSTGRES_ENABLE_SSL_AUTH):
         args = args + (get_ssl_connection(), )
     run_subprocess_command(pg_dump, pg_dump_log, ' '.join(args))
     return table_dump_file_path
@@ -150,7 +150,7 @@ def get_current_datetime():
 def format_datetime(datetime):
     return datetime.strftime(r'%Y-%m-%dT%H:%M:%SZ')
 
-def convertStringToBool(input):
+def convert_string_to_bool(input):
     if input is None:
         return False
     return input.lower() in ['true', '1', 't', 'y', 'yes']
@@ -193,7 +193,7 @@ def upload_to_s3(file_path, bucket_name, dump_key):
             raise ObjectKeyAlreadyExists(f'Object key: {dump_key} already exists on the bucket: {bucket_name}')
 
         # upload dump
-        bucket.upload_file(file_path, dump_key)
+        bucket.upload_file(file_path, dump_key, ExtraArgs={'ACL':'public-read'})
 
     except (EndpointConnectionError, SSLError) as connection_error:
         log_and_exit(str(connection_error), EXIT_CODES['s3_connection_error'])
@@ -252,10 +252,10 @@ def main():
     created_ng_dump_path = create_ng_dump(table_dump_file_path=created_dump_table_path, dump_ng_name=dump_name_with_file_format)
 
     # upload to object storage
-    if convertStringToBool(UPLOAD_TO_OBJECT_STORAGE):
+    if convert_string_to_bool(UPLOAD_TO_OBJECT_STORAGE):
         bucket_name = object_strorage_config['bucket_name']
         upload_to_s3(file_path=created_ng_dump_path, bucket_name=bucket_name, dump_key=dump_name_with_file_format)
-        if convertStringToBool(UPLOAD_TO_DUMP_SERVER):
+        if convert_string_to_bool(UPLOAD_TO_DUMP_SERVER):
             upload_to_dump_server(dump_name=dump_name_with_file_format, bucket_name=bucket_name, dump_timestamp=timestamp)
 
     log.info(f'{app_name} container finished job successfully')
