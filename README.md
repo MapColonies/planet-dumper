@@ -27,6 +27,7 @@ Optional environment variables:
 - `OBJECT_STORAGE_USE_SSL` - Whether or not to use SSL, defaults to false
 - `OBJECT_STORAGE_VERIFY_ROOT_CERT` - Whether or not to verify SSL root certificate, defaults to false
 - `DUMP_SERVER_VERIFY_ROOT_CERT` - Whether or not to verify SSL root certificate, defaults to false
+- `DUMP_ACL` - The Access-Control-List for the uploaded dump in the object storage, defaults to `public-read`. [read more](https://docs.aws.amazon.com/AmazonS3/latest/userguide/acl-overview.html#canned-acl)
 
 Required if `UPLOAD_TO_OBJECT_STORAGE` is true:
 
@@ -93,8 +94,8 @@ notice that the postgresql-client version should be determined by your postgresq
 ```
     docker build \
     --build-arg PLANET_DUMP_NG_VERSION=v1.2.0 \
-    --build-arg POSTGRESQL_VERSION=12 \
-    -f ./Dockerfile -t planet-dumper:v1 .
+    --build-arg POSTGRESQL_VERSION=13 \
+    -f ./Dockerfile -t planet-dumper:latest .
 ```
 
 ### Running the container
@@ -102,5 +103,5 @@ notice that the postgresql-client version should be determined by your postgresq
 ```
     docker run \
     --env-file .env \
-    -t planet-dumper:v1
+    -t planet-dumper:latest
 ```

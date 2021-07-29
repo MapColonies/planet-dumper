@@ -24,6 +24,8 @@ object_strorage_config = {}
 dump_server_config = {}
 postgres_config = {}
 
+DEFAULT_DUMP_ACL = 'public-read'
+
 EXIT_CODES = {
     'success': 0,
     'general_error': 1,
@@ -43,6 +45,7 @@ DUMP_NAME_PREFIX = os.getenv('DUMP_NAME_PREFIX')
 UPLOAD_TO_OBJECT_STORAGE = os.getenv('UPLOAD_TO_OBJECT_STORAGE')
 UPLOAD_TO_DUMP_SERVER = os.getenv('UPLOAD_TO_DUMP_SERVER')
 POSTGRES_ENABLE_SSL_AUTH = os.getenv('POSTGRES_ENABLE_SSL_AUTH')
+DUMP_ACL = os.getenv('DUMP_ACL', DEFAULT_DUMP_ACL)
 
 class BucketDoesNotExistError(Exception):
     pass
@@ -193,7 +196,7 @@ def upload_to_s3(file_path, bucket_name, dump_key):
             raise ObjectKeyAlreadyExists(f'Object key: {dump_key} already exists on the bucket: {bucket_name}')
 
         # upload dump
-        bucket.upload_file(file_path, dump_key, ExtraArgs={'ACL':'public-read'})
+        bucket.upload_file(file_path, dump_key, ExtraArgs={'ACL': DUMP_ACL })
 
     except (EndpointConnectionError, SSLError) as connection_error:
         log_and_exit(str(connection_error), EXIT_CODES['s3_connection_error'])
