@@ -1,9 +1,11 @@
+ARG NODE_VERSION=14
+
 FROM ubuntu:20.04 AS builder
-ARG PLANET_DUMP_NG_VERSION=v1.2.0
+
 ENV DEBIAN_FRONTEND=noninteractive
+ARG PLANET_DUMP_NG_TAG=v1.2.3
 WORKDIR /app
 
-# planet-dump-ng
 RUN apt-get update \
     && apt-get install -y build-essential \
     automake \
@@ -19,24 +21,38 @@ RUN apt-get update \
     osmpbf-bin \
     libprotobuf-dev\
     pkg-config \
-    curl
+    git-core
 
-RUN curl -L -o planet-dump-ng.tgz "https://github.com/zerebubuth/planet-dump-ng/archive/$PLANET_DUMP_NG_VERSION.tar.gz" \
-  && mkdir -p planet-dump-ng \
-  && tar xzf planet-dump-ng.tgz -C planet-dump-ng --strip-components=1 \
-  && rm -f planet-dump-ng.tgz \
+RUN git clone -b ${PLANET_DUMP_NG_TAG} --single-branch https://github.com/zerebubuth/planet-dump-ng.git ./planet-dump-ng \
   && cd planet-dump-ng \
   && ./autogen.sh \
   && ./configure \
   && make
 
-FROM ubuntu:20.04
-ARG POSTGRESQL_VERSION=13
-ENV DEBIAN_FRONTEND=noninteractive
+FROM node:${NODE_VERSION} as buildApp
 
-# postgresql-client & planet-dump-ng dependencies
+WORKDIR /tmp/buildApp
+
+COPY ./package*.json ./
+
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM ubuntu:20.04 as production
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV workdir /app
+ARG POSTGRESQL_VERSION=13
+ARG NODE_VERSION
+
+WORKDIR ${workdir}
+
+COPY --from=builder /app/planet-dump-ng/planet-dump-ng /usr/local/bin
+
 RUN apt-get update \
-    && apt-get install -y lsb-release \
+    && apt-get install -y gnupg \
+    lsb-release \
     libxml2-dev \
     libboost-program-options-dev \
     libboost-filesystem-dev \
@@ -45,27 +61,30 @@ RUN apt-get update \
     libboost-iostreams-dev \
     libosmpbf-dev \
     wget \
-    python3-pip \
     && apt-get clean all \
     && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
     && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
     && apt-get update \
-    && apt-get -y install postgresql-client-$POSTGRESQL_VERSION
+    && apt-get -y install postgresql-client-${POSTGRESQL_VERSION}
 
-COPY --from=builder /app/planet-dump-ng/planet-dump-ng /usr/local/bin
+RUN apt-get update \
+    && apt-get -y install curl \
+    && curl -L https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash \
+    && apt-get -y install nodejs libboost-filesystem-dev libpq-dev libproj-dev liblua5.3-dev libboost-program-options-dev
 
-ENV workdir /app
-WORKDIR $workdir
-COPY ./requirements.txt .
-RUN pip3 install -r requirements.txt
+COPY ./package*.json ./
+
+RUN npm ci --only=production
+
+COPY --from=buildApp /tmp/buildApp/dist .
+COPY ./config ./config
 COPY start.sh .
-COPY planet-dumper.py .
 
 RUN chgrp root $workdir/start.sh && chmod -R a+rwx $workdir && \
     mkdir /.postgresql && chmod g+w /.postgresql
 
-RUN useradd -ms /bin/bash user && usermod -a -G root user
-
-USER user
+# uncomment while developing to make sure the docker runs on openshift
+# RUN useradd -ms /bin/bash user && usermod -a -G root user
+# USER user
 
 CMD ./start.sh
