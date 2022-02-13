@@ -1,39 +1,19 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/naming-convention */ // s3-client object commands arguments
 import { Readable } from 'stream';
 import { Logger } from '@map-colonies/js-logger';
-import { S3Client, HeadObjectCommand, HeadBucketCommand, HeadObjectCommandOutput, HeadBucketCommandOutput } from '@aws-sdk/client-s3';
-import { Upload, Progress } from '@aws-sdk/lib-storage';
+import {
+  S3Client,
+  HeadObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommandOutput,
+  HeadBucketCommandOutput,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
 import { S3Error } from '../common/errors';
 import { IConfig, S3Config } from '../common/interfaces';
 import { S3_NOT_FOUND_ERROR_NAME, S3_REGION } from '../common/constants';
 
 type ValidationType = 'bucket' | 'object';
-
-type StringifiedProgress = { [Property in keyof Progress]-?: string };
-
-// TODO: fix types (Upload, Progress)
-interface ProgressLike {
-  loaded?: number;
-  total?: number;
-  part?: number;
-  Key?: string;
-  Bucket?: string;
-}
-
-const stringifyProgress = (progress: Progress): StringifiedProgress => {
-  const undefinedValue = '-';
-  const result: { [k: string]: string } = {};
-
-  Object.entries(progress as ProgressLike).forEach(([key, value]) => {
-    const stringifiedValue = value != undefined ? value.toString() : undefinedValue;
-    result[key] = stringifiedValue;
-  });
-
-  return result as StringifiedProgress;
-};
 
 export class S3ClientWrapper {
   private readonly s3Config: S3Config;
@@ -48,37 +28,17 @@ export class S3ClientWrapper {
     });
   }
 
-  public async multipartUploadWrapper(key: string, body: Readable): Promise<void> {
-    const {
-      bucketName,
-      acl,
-      upload: { concurrency, logProgress, sizePerPart },
-    } = this.s3Config;
-
-    this.logger.info(`putting key ${key} in bucket ${this.s3Config.bucketName} with ${this.s3Config.acl} acl`);
-    this.logger.debug(`initializing multiplart upload command with concurrency: ${concurrency} size per part: ${sizePerPart}`);
-
-    const upload = new Upload({
-      client: this.s3Client,
-      params: { Bucket: `${bucketName}`, Key: key, Body: body, ACL: acl },
-      queueSize: concurrency,
-      partSize: sizePerPart,
-    });
-
-    if (logProgress) {
-      upload.on('httpUploadProgress', (progress) => {
-        const { Bucket, Key, part, loaded, total } = stringifyProgress(progress);
-        this.logger.info(`upload of key: ${Key} to bucket: ${Bucket} part: ${part}, loaded ${loaded} out of ${total}`);
-      });
-    }
+  public async putObjectWrapper(key: string, body: Readable): Promise<void> {
+    const { bucketName, acl } = this.s3Config;
+    this.logger.info(`putting key ${key} in bucket ${bucketName} with ${acl} acl`);
 
     try {
-      await upload.done();
+      const command = new PutObjectCommand({ Bucket: bucketName, Key: key, Body: body, ACL: acl });
+      await this.s3Client.send(command);
     } catch (error) {
       const s3Error = error as Error;
       this.logger.error(s3Error);
-      await upload.abort();
-      throw new S3Error(`an error occurred during the put of key ${key} on bucket ${this.s3Config.bucketName}, ${s3Error.message}`);
+      throw new S3Error(`an error occurred during the put of key ${key} on bucket ${bucketName}, ${s3Error.message}`);
     }
   }
 

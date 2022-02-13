@@ -37,15 +37,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.39.0",
-    "@aws-sdk/lib-storage": "^3.48.0",
     "@map-colonies/js-logger": "^0.0.3",
     "axios": "^0.24.0",
-    "better-ajv-errors": "^1.1.2",
     "concat-stream": "^2.0.0",
-    "config": "^3.3.6",
-    "http-status-codes": "^2.2.0",
-    "reflect-metadata": "^0.1.13",
-    "zx": "^4.2.0"
+    "config": "^3.3.6"
   },
   "devDependencies": {
     "@commitlint/cli": "^13.2.1",

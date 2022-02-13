@@ -35,15 +35,7 @@
   "s3": {
     "endpoint": "S3_ENDPOINT",
     "bucketName": "S3_BUCKET_NAME",
-    "acl": "S3_ACL",
-    "upload": {
-      "concurrency": "S3_UPLOAD_CONCURRENCY",
-      "sizePerPart": "S3_UPLOAD_SIZE_PER_PART",
-      "logProgress": {
-        "__name": "S3_UPLOAD_LOG_PROGRESS",
-        "__format": "boolean"
-      }
-    }
+    "acl": "S3_ACL"
   },
   "postgres": {
     "enableSslAuth": {

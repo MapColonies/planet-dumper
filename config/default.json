@@ -22,12 +22,7 @@
   "s3": {
     "endpoint": "http://localhost:9000/",
     "bucketName": "planet-dumps",
-    "acl": "public-read",
-    "upload": {
-      "concurrency": "4",
-      "sizePerPart": "5MB",
-      "logProgress": true
-    }
+    "acl": "public-read"
   },
   "postgres": {
     "enableSslAuth": false,

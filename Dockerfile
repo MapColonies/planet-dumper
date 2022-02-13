@@ -1,6 +1,6 @@
 ARG NODE_VERSION=14
 
-FROM ubuntu:20.04 AS builder
+FROM ubuntu:20.04 AS buildPlanetDumpNg
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG PLANET_DUMP_NG_TAG=v1.2.3
@@ -48,7 +48,7 @@ ARG NODE_VERSION
 
 WORKDIR ${workdir}
 
-COPY --from=builder /app/planet-dump-ng/planet-dump-ng /usr/local/bin
+COPY --from=buildPlanetDumpNg /app/planet-dump-ng/planet-dump-ng /usr/local/bin
 
 RUN apt-get update \
     && apt-get install -y gnupg \

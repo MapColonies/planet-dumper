@@ -98,7 +98,7 @@ const uploadDumpToS3 = async (filePath: string, key: string): Promise<void> => {
 
   const uploadStream = fs.createReadStream(filePath);
 
-  await s3Client.multipartUploadWrapper(key, uploadStream);
+  await s3Client.putObjectWrapper(key, uploadStream);
 };
 
 const uploadToDumpServer = async (dumpMetadata: DumpMetadata): Promise<void> => {
