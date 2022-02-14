@@ -1,4 +1,22 @@
 /* eslint-disable @typescript-eslint/naming-convention */
+import { readPackageJsonSync } from '@map-colonies/read-pkg';
+
+export const CLI_NAME = readPackageJsonSync().name ?? 'unknown_cli';
+
+export const IGNORED_OUTGOING_TRACE_ROUTES = [/^.*\/v1\/metrics.*$/];
+export const IGNORED_INCOMING_TRACE_ROUTES = [/^.*\/docs.*$/];
+
+export const CLI_BUILDER = Symbol('cliBuilder');
+export const ON_SIGNAL = Symbol('onSignal');
+export const EXIT_CODE = Symbol('exitCode');
+
+export const SERVICES: Record<string, symbol> = {
+  LOGGER: Symbol('Logger'),
+  CONFIG: Symbol('Config'),
+  S3: Symbol('S3'),
+  HTTP_CLIENT: Symbol('HttpClient'),
+};
+
 export const ExitCodes = {
   SUCCESS: 0,
   GENERAL_ERROR: 1,

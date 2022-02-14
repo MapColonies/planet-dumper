@@ -1,28 +1,16 @@
 {
-  "logger": {
-    "level": "info",
-    "prettyPrint": false
+  "telemetry": {
+    "logger": {
+      "level": "info",
+      "prettyPrint": false
+    },
+    "tracing": {
+      "enabled": false,
+      "url": "http://localhost:4318/v1/trace"
+    }
   },
   "httpClient": {
     "timeout": 1000
-  },
-  "app": {
-    "dumpName": {
-      "dumpPrefix": {
-        "enabled": false
-      },
-      "addTimestamp": true,
-      "value": "dumpName"
-    },
-    "dumpUpload": {
-      "s3": true,
-      "dumpServer": true
-    }
-  },
-  "s3": {
-    "endpoint": "http://localhost:9000/",
-    "bucketName": "planet-dumps",
-    "acl": "public-read"
   },
   "postgres": {
     "enableSslAuth": false,
@@ -34,12 +22,5 @@
   },
   "pgDump": {
     "verbose": true
-  },
-  "dumpServer": {
-    "endpoint": "https://dump-server.com",
-    "token": {
-      "enabled": true,
-      "value": "dQw4w9WgXcQ"
-    }
   }
 }

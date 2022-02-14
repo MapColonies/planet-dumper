@@ -3,30 +3,16 @@ export interface IConfig {
   has: (setting: string) => boolean;
 }
 
-export interface AppConfig {
-  dumpName: {
-    dumpPrefix: {
-      enabled: boolean;
-      value?: string;
-    };
-    addTimestamp: boolean;
-    value: string;
-  };
-  dumpUpload: {
-    s3: boolean;
-    dumpServer: boolean;
-  };
+export interface DumpNameOptions {
+  dumpNamePrefix?: string;
+  dumpName: string;
+  dumpNameTimestamp: boolean;
 }
 
 export interface S3Config {
-  endpoint: string;
-  bucketName: string;
-  acl: string;
-  upload: {
-    concurrency: number;
-    sizePerPart: number;
-    logProgress: boolean;
-  };
+  s3Endpoint: string;
+  s3BucketName: string;
+  s3Acl: string;
 }
 
 export interface PostgresConfig {
@@ -39,11 +25,8 @@ export interface PgDumpConfig {
 }
 
 export interface DumpServerConfig {
-  endpoint: string;
-  token: {
-    enabled: boolean;
-    value?: string;
-  };
+  dumpServerEndpoint: string;
+  dumpServerToken?: string;
 }
 
 export interface DumpMetadata {

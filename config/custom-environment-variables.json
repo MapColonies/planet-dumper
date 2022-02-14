@@ -1,9 +1,21 @@
 {
-  "logger": {
-    "level": "LOG_LEVEL",
-    "prettyPrint": {
-      "__name": "LOG_PRETTY_PRINT_ENABLED",
-      "__format": "boolean"
+  "telemetry": {
+    "serviceName": "TELEMETRY_SERVICE_NAME",
+    "hostname": "TELEMETRY_HOST_NAME",
+    "version": "TELEMETRY_SERVICE_VERSION",
+    "logger": {
+      "level": "LOG_LEVEL",
+      "prettyPrint": {
+        "__name": "LOG_PRETTY_PRINT_ENABLED",
+        "__format": "boolean"
+      }
+    },
+    "tracing": {
+      "enabled": {
+        "__name": "TELEMETRY_TRACING_ENABLED",
+        "__format": "boolean"
+      },
+      "url": "TELEMETRY_TRACING_URL"
     }
   },
   "httpClient": {
@@ -11,31 +23,6 @@
       "__name": "HTTP_CLIENT_TIMEOUT",
       "__format": "number"
     }
-  },
-  "app": {
-    "dumpName": {
-      "prefix": {
-        "enabled": {
-          "__name": "APP_DUMP_NAME_PREFIX_ENABLED",
-          "__format": "boolean"
-        },
-        "value": "APP_DUMP_NAME_PREFIX_VALUE"
-      },
-      "addTimestamp": {
-        "__name": "APP_DUMP_NAME_ADD_TIMESTAMP",
-        "__format": "boolean"
-      },
-      "value": "APP_DUMP_NAME_VALUE"
-    },
-    "dumpUpload": {
-      "s3": "APP_DUMP_UPLOAD_S3",
-      "dumpServer": "APP_DUMP_UPLOAD_DUMP_SERVER"
-    }
-  },
-  "s3": {
-    "endpoint": "S3_ENDPOINT",
-    "bucketName": "S3_BUCKET_NAME",
-    "acl": "S3_ACL"
   },
   "postgres": {
     "enableSslAuth": {
@@ -52,16 +39,6 @@
     "verbose": {
       "__name": "PG_DUMP_VERBOSE",
       "__format": "boolean"
-    }
-  },
-  "dumpServer": {
-    "endpoint": "DUMP_SERVER_ENDPOINT",
-    "token": {
-      "enabled": {
-        "__name": "DUMP_SERVER_TOKEN_ENABLED",
-        "__format": "boolean"
-      },
-      "value": "DUMP_SERVER_TOKEN_VALUE"
     }
   }
 }

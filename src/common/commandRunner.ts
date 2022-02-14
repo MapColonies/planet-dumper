@@ -1,10 +1,12 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import * as readline from 'readline';
 import { PassThrough } from 'stream';
+import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
 import concatStream from 'concat-stream';
 import { Executable } from '../common/types';
 import { IConfig, PgDumpConfig, PostgresConfig } from './interfaces';
+import { SERVICES } from './constants';
 
 interface ExecuteReturn {
   stdout: string;
@@ -22,11 +24,12 @@ const readStream = async (stream: NodeJS.ReadableStream): Promise<string> => {
   });
 };
 
+@injectable()
 export class CommandRunner {
   // eslint-disable-next-line @typescript-eslint/naming-convention
   private readonly globalCommandArgs: Record<Executable, string[]> = { pg_dump: [], 'planet-dump-ng': [] };
 
-  public constructor(private readonly logger: Logger, private readonly config: IConfig) {
+  public constructor(@inject(SERVICES.LOGGER) private readonly logger: Logger, @inject(SERVICES.CONFIG) private readonly config: IConfig) {
     this.processConfig(config);
   }
 

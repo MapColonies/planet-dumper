@@ -72,8 +72,6 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 | 100              | pg-dump error             | the program threw an exception raised by pg_dump.                               |
 | 101              | planet-dump-ng error      | the program threw an exception raised by planet-dump-ng.                        |
 | 102              | s3 general error          | the program threw a general exception raised in the process of uploading to s3. |
-| 103              | s3 connection error       | s3 connection error occurred.                                                   |
-| 104              | s3 upload error           | s3 upload failed.                                                               |
 | 105              | s3 bucket not exist       | the given bucket name does not exist on the object storage.                     |
 | 106              | object key already exists | the created dump has an object key which does already exist on the bucket.      |
 | 107              | missing env arg           | missing a required environment argument.                                        |
