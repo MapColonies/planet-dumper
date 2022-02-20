@@ -21,6 +21,6 @@
     }
   },
   "pgDump": {
-    "verbose": true
+    "verbose": false
   }
 }
