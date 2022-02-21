@@ -20,7 +20,9 @@ Options:
                                             and the lua script
                                                              [string] [required]
   -a, --s3Acl, --s3-acl                     The canned acl policy for uploaded
-                                            objects          [string] [required]
+                                            objects
+  [choices: "authenticated-read", "private", "public-read", "public-read-write"]
+                                                            [default: "private"]
   -s, --dumpServerEndpoint,                 The endpoint of the dump-server
   --dump-server-endpoint                                                [string]
       --dumpServerToken, --tkn,             The token of the dump-server used

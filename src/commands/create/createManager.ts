@@ -52,12 +52,12 @@ export class CreateManager {
     return pgDumpOutputPath;
   }
 
-  public async createNgDump(pgDumpFilePath: string, ngDumpName: string): Promise<string> {
+  public async createOsmDump(pgDumpFilePath: string, osmDumpName: string): Promise<string> {
     this.logger.info('creating ng dump');
 
     const executable: Executable = 'planet-dump-ng';
-    const ngDumpOutputPath = join(NG_DUMPS_PATH, ngDumpName);
-    const args = [`--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpOutputPath}`];
+    const osmDumpOutputPath = join(NG_DUMPS_PATH, osmDumpName);
+    const args = [`--dump-file=${pgDumpFilePath}`, `--pbf=${osmDumpOutputPath}`];
 
     const { exitCode } = await this.commandRunner.run(executable, undefined, args);
 
@@ -66,10 +66,10 @@ export class CreateManager {
       throw new PlanetDumpNgError(`an error occurred while running ${executable}, exit code ${exitCode as number}`);
     }
 
-    return ngDumpOutputPath;
+    return osmDumpOutputPath;
   }
 
-  public async uploadDumpToS3(filePath: string, bucketName: string, key: string, acl: string): Promise<void> {
+  public async uploadFileToS3(filePath: string, bucketName: string, key: string, acl: string): Promise<void> {
     this.logger.info(`strating the upload of file ${filePath} as key ${key} to s3 bucket ${bucketName}`);
 
     if (!(await this.s3Client.validateExistance('bucket', bucketName))) {
@@ -85,7 +85,7 @@ export class CreateManager {
     await this.s3Client.putObjectWrapper(bucketName, key, uploadStream, acl);
   }
 
-  public async uploadToDumpServer(dumpServerConfig: DumpServerConfig, dumpMetadata: DumpMetadata): Promise<void> {
+  public async registerOnDumpServer(dumpServerConfig: DumpServerConfig, dumpMetadata: DumpMetadata): Promise<void> {
     this.logger.info(`strating the upload of ${dumpMetadata.name} to dump-server`);
 
     await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });

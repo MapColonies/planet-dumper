@@ -33,9 +33,8 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
       .option('s3Acl', {
         alias: ['a', 's3-acl'],
         describe: 'The canned acl policy for uploaded objects',
-        nargs: 1,
-        type: 'string',
-        demandOption: true,
+        choices: ['authenticated-read', 'private', 'public-read', 'public-read-write'],
+        default: 'private',
       })
       .option('dumpServerEndpoint', {
         alias: ['s', 'dump-server-endpoint'],
@@ -98,11 +97,11 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
       const pgDumpName = `${dumpMetadata.name}.${PG_DUMP_FILE_FORMAT}`;
       const pgDumpPath = await this.manager.createPgDump(pgDumpName);
 
-      const ngDumpPath = await this.manager.createNgDump(pgDumpPath, dumpMetadata.name);
+      const osmDumpPath = await this.manager.createOsmDump(pgDumpPath, dumpMetadata.name);
 
-      await this.manager.uploadDumpToS3(ngDumpPath, s3BucketName, dumpMetadata.name, s3Acl);
+      await this.manager.uploadFileToS3(osmDumpPath, s3BucketName, dumpMetadata.name, s3Acl);
       if (dumpServerEndpoint) {
-        await this.manager.uploadToDumpServer({ dumpServerEndpoint, dumpServerToken }, dumpMetadata);
+        await this.manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerToken }, dumpMetadata);
       }
 
       this.logger.info(`successfully created ${dumpMetadata.name}`);
