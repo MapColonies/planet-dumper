@@ -1,6 +1,6 @@
 {
   "name": "planet-dumper",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "a cli wrapper for planet-dump-ng and pg_dump functionality",
   "main": "./src/index.ts",
   "scripts": {
