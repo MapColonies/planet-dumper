@@ -1,6 +1,8 @@
 import { Logger } from '@map-colonies/js-logger';
-import axios, { AxiosInstance } from 'axios';
-import { DumpMetadata, DumpServerConfig, IConfig } from '../common/interfaces';
+import { AxiosInstance } from 'axios';
+import { inject, injectable } from 'tsyringe';
+import { SERVICES } from '../common/constants';
+import { DumpMetadata, DumpServerConfig } from '../common/interfaces';
 import { AxiosRequestArgsWithData, BaseClient, HttpResponse } from './baseClient';
 
 const DUMP_METADATA_ENDPOINT = 'dumps';
@@ -9,23 +11,19 @@ export interface DumpMetadataCreationBody extends Required<DumpMetadata> {
   description?: string;
 }
 
-export class DumpClient extends BaseClient {
-  private readonly dumpServerConfig: DumpServerConfig;
-  private readonly httpClient: AxiosInstance;
-
-  public constructor(logger: Logger, private readonly config: IConfig) {
+@injectable()
+export class DumpServerClient extends BaseClient {
+  public constructor(@inject(SERVICES.LOGGER) logger: Logger, @inject(SERVICES.HTTP_CLIENT) private readonly httpClient: AxiosInstance) {
     super(logger);
-    this.httpClient = axios.create({ timeout: config.get('httpClient.timeout') });
-    this.dumpServerConfig = config.get<DumpServerConfig>('dumpServer');
   }
 
-  public async postDumpMetadata(body: DumpMetadataCreationBody): Promise<HttpResponse<string>> {
-    const { endpoint, token } = this.dumpServerConfig;
+  public async postDumpMetadata(dumpServerConfig: DumpServerConfig, body: DumpMetadataCreationBody): Promise<HttpResponse<string>> {
+    const { dumpServerEndpoint: endpoint, dumpServerToken: token } = dumpServerConfig;
     this.logger.info(`invoking POST to ${endpoint}/${DUMP_METADATA_ENDPOINT}`);
 
     const headers: Record<string, string> = {};
-    if (token.enabled) {
-      headers['Authorization'] = `Bearer ${token.value as string}`;
+    if (token !== undefined) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     const funcRef = this.httpClient.post.bind(this.httpClient);

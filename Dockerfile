@@ -87,4 +87,4 @@ RUN chgrp root $workdir/start.sh && chmod -R a+rwx $workdir && \
 # RUN useradd -ms /bin/bash user && usermod -a -G root user
 # USER user
 
-CMD ./start.sh
+ENTRYPOINT [ "/app/start.sh" ]
