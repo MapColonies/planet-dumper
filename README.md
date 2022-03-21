@@ -19,6 +19,8 @@ Options:
   -b, --s3BucketName, --s3-bucket-name      The bucket name containing the state
                                             and the lua script
                                                              [string] [required]
+      --s3ProjectId, --pid,                 The project id for specified s3
+      --s3-project-id                       endpoint                    [string]
   -a, --s3Acl, --s3-acl                     The canned acl policy for uploaded
                                             objects
   [choices: "authenticated-read", "private", "public-read", "public-read-write"]
@@ -62,6 +64,9 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 - `POSTGRES_SSL_CERT` - path to cert file
 - `POSTGRES_SSL_KEY` - path to cert auth kay
 - `POSTGRES_SSL_ROOT_CERT` - path to root cert
+- `POSTGRES_SSL_MODE` - the ssl mode
+- `POSTGRES_CERTS_MOUNT_PATH` - the path for certificates to be mounted to and copied from
+- `POSTGRES_CERTIFICATES_PATH` - the path for certificates to be copied to, by default `/.postgresql`
 
 **Exit Codes:**
 

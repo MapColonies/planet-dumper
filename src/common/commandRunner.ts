@@ -7,6 +7,7 @@ import concatStream from 'concat-stream';
 import { Executable } from '../common/types';
 import { IConfig, PgDumpConfig, PostgresConfig } from './interfaces';
 import { SERVICES } from './constants';
+import { isStringUndefinedOrEmpty } from './util';
 
 interface ExecuteReturn {
   stdout: string;
@@ -78,11 +79,20 @@ export class CommandRunner {
 
     const postgresConfig = config.get<PostgresConfig>('postgres');
     if (postgresConfig.enableSslAuth) {
-      const { cert, key, ca } = postgresConfig.sslPaths;
+      const { sslPaths: { cert, key, ca }, sslMode } = postgresConfig;
 
-      pgDumpGlobalArgs.push(`sslcert=${cert}`);
-      pgDumpGlobalArgs.push(`sslkey=${key}`);
-      pgDumpGlobalArgs.push(`sslrootcert=${ca}`);
+      if (!isStringUndefinedOrEmpty(cert)) {
+        pgDumpGlobalArgs.push(`sslcert=${cert}`);
+      }
+      if (!isStringUndefinedOrEmpty(key)) {
+        pgDumpGlobalArgs.push(`sslkey=${key}`);
+      }
+      if (!isStringUndefinedOrEmpty(ca)) {
+        pgDumpGlobalArgs.push(`sslrootcert=${ca}`);
+      }
+      if (!isStringUndefinedOrEmpty(sslMode)) {
+        pgDumpGlobalArgs.push(`sslmode=${sslMode}`);
+      }
     }
   }
 }

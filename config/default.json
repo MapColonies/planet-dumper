@@ -18,7 +18,8 @@
       "ca": "",
       "key": "",
       "cert": ""
-    }
+    },
+    "sslMode": "require"
   },
   "pgDump": {
     "verbose": false

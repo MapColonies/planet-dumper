@@ -80,8 +80,7 @@ COPY --from=buildApp /tmp/buildApp/dist .
 COPY ./config ./config
 COPY start.sh .
 
-RUN chgrp root $workdir/start.sh && chmod -R a+rwx $workdir && \
-    mkdir /.postgresql && chmod g+w /.postgresql
+RUN chgrp root $workdir/start.sh && chmod -R a+rwx $workdir
 
 # uncomment while developing to make sure the docker runs on openshift
 # RUN useradd -ms /bin/bash user && usermod -a -G root user

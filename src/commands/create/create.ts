@@ -6,6 +6,7 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { ExitCodes, EXIT_CODE, PG_DUMP_FILE_FORMAT, S3_REGION, SERVICES } from '../../common/constants';
 import { ErrorWithExitCode } from '../../common/errors';
 import { DumpNameOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
+import { isStringUndefinedOrEmpty } from '../../common/util';
 import { CreateManager } from './createManager';
 
 export type CreateArguments = S3Config & DumpNameOptions & DumpServerConfig;
@@ -29,6 +30,12 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         nargs: 1,
         type: 'string',
         demandOption: true,
+      })
+      .option('s3ProjectId', {
+        alias: ['pid', 's3-project-id'],
+        describe: 'The project id for specified s3 endpoint',
+        nargs: 1,
+        type: 'string'
       })
       .option('s3Acl', {
         alias: ['a', 's3-acl'],
@@ -89,7 +96,7 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
   };
 
   public handler = async (argv: Arguments<CreateArguments>): Promise<void> => {
-    const { dumpName, dumpNamePrefix, dumpNameTimestamp, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerToken } = argv;
+    const { dumpName, dumpNamePrefix, dumpNameTimestamp, s3BucketName, s3ProjectId, s3Acl, dumpServerEndpoint, dumpServerToken } = argv;
 
     try {
       const dumpMetadata = this.manager.buildDumpMetadata({ dumpName, dumpNamePrefix, dumpNameTimestamp }, s3BucketName);
@@ -99,7 +106,11 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
 
       const osmDumpPath = await this.manager.createOsmDump(pgDumpPath, dumpMetadata.name);
 
-      await this.manager.uploadFileToS3(osmDumpPath, s3BucketName, dumpMetadata.name, s3Acl);
+      let bucketNameWithProjectId = s3BucketName;
+      if (!isStringUndefinedOrEmpty(s3ProjectId)) {
+        bucketNameWithProjectId = `${s3ProjectId as string}:${s3BucketName}`;
+      }
+      await this.manager.uploadFileToS3(osmDumpPath, bucketNameWithProjectId, dumpMetadata.name, s3Acl);
       if (dumpServerEndpoint) {
         await this.manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerToken }, dumpMetadata);
       }

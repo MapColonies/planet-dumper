@@ -33,7 +33,8 @@
       "ca": "POSTGRES_CA_PATH",
       "key": "POSTGRES_KEY_PATH",
       "cert": "POSTGRES_CERT_PATH"
-    }
+    },
+    "sslMode": "POSTGRES_SSL_MODE"
   },
   "pgDump": {
     "verbose": {
