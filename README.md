@@ -61,9 +61,9 @@ Optional environment variables:
 
 Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 
-- `POSTGRES_SSL_CERT` - path to cert file
-- `POSTGRES_SSL_KEY` - path to cert auth kay
-- `POSTGRES_SSL_ROOT_CERT` - path to root cert
+- `POSTGRES_CERT_PATH` - path to cert file
+- `POSTGRES_KEY_PATH` - path to cert auth kay
+- `POSTGRES_CA_PATH` - path to root cert
 - `POSTGRES_SSL_MODE` - the ssl mode
 - `POSTGRES_CERTS_MOUNT_PATH` - the path for certificates to be mounted to and copied from
 - `POSTGRES_CERTIFICATES_PATH` - the path for certificates to be copied to, by default `/.postgresql`
