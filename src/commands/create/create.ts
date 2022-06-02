@@ -72,7 +72,13 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         const { dumpServerEndpoint } = argv;
 
         if (dumpServerEndpoint !== undefined && isWebUri(dumpServerEndpoint) === undefined) {
-          throw new Error(`provided dump-server endpoint ${dumpServerEndpoint} is not a valid web uri`);
+          this.logger.error({
+            msg: 'argument validation failure',
+            command: this.command,
+            argument: 'dump-server-endpoint',
+            received: dumpServerEndpoint,
+          });
+          throw new Error(`provided dump-server-endpoint ${dumpServerEndpoint} is not a valid web uri`);
         }
         return true;
       })
@@ -88,8 +94,11 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
     return yargs as Argv<CreateArguments>;
   };
 
-  public handler = async (argv: Arguments<CreateArguments>): Promise<void> => {
-    const { dumpName, dumpNamePrefix, dumpNameTimestamp, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerToken } = argv;
+  public handler = async (args: Arguments<CreateArguments>): Promise<void> => {
+    const { awsSecretAccessKey, awsAccessKeyId, pgpassword, pguser, ...restOfArgs } = args;
+    this.logger.debug({ msg: 'starting command execution', command: this.command, args: restOfArgs });
+
+    const { dumpName, dumpNamePrefix, dumpNameTimestamp, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerToken } = restOfArgs;
 
     try {
       const dumpMetadata = this.manager.buildDumpMetadata({ dumpName, dumpNamePrefix, dumpNameTimestamp }, s3BucketName);
@@ -104,17 +113,16 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         await this.manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerToken }, dumpMetadata);
       }
 
-      this.logger.info(`successfully created ${dumpMetadata.name}`);
+      this.logger.info({ msg: 'finished command execution successfully', command: this.command, dumpMetadata });
     } catch (error) {
       let exitCode = ExitCodes.GENERAL_ERROR;
+
       if (error instanceof ErrorWithExitCode) {
         exitCode = error.exitCode;
-      } else {
-        this.logger.error((error as Error).message);
       }
 
       container.register(EXIT_CODE, { useValue: exitCode });
-      this.logger.warn(`an error occurred, exiting with code ${exitCode}`);
+      this.logger.error({ err: error, msg: 'an error occurred while executing command', command: this.command, exitCode });
     }
   };
 }

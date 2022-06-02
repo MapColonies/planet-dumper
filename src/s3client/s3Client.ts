@@ -21,14 +21,14 @@ export class S3ClientWrapper {
   public constructor(@inject(SERVICES.LOGGER) private readonly logger: Logger, @inject(SERVICES.S3) private readonly s3Client: S3Client) {}
 
   public async putObjectWrapper(bucket: string, key: string, body: Readable, acl?: ObjectCannedACL | string): Promise<void> {
-    this.logger.info(`putting key ${key} in bucket ${bucket} with ${acl !== undefined ? acl : `default`} acl`);
+    this.logger.debug({ msg: 'putting key in bucket', key, bucketName: bucket, acl });
 
     try {
       const command = new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ACL: acl });
       await this.s3Client.send(command);
     } catch (error) {
       const s3Error = error as Error;
-      this.logger.error(s3Error);
+      this.logger.error({ err: s3Error, msg: 'failed putting key in bucket', acl, bucketName: bucket });
       throw new S3Error(`an error occurred during the put of key ${key} on bucket ${bucket}, ${s3Error.message}`);
     }
   }
@@ -39,7 +39,7 @@ export class S3ClientWrapper {
   }
 
   private async headBucketWrapper(bucket: string): Promise<HeadBucketCommandOutput | undefined> {
-    this.logger.info(`initializing head bucket ${bucket} command`);
+    this.logger.debug({ msg: 'heading bucket', bucketName: bucket });
 
     try {
       const command = new HeadBucketCommand({ Bucket: bucket });
@@ -49,13 +49,14 @@ export class S3ClientWrapper {
       if (s3Error.name === S3_NOT_FOUND_ERROR_NAME) {
         return undefined;
       }
-      this.logger.error(s3Error);
+
+      this.logger.error({ err: s3Error, msg: 'failed to head bucket', bucketName: bucket });
       throw new S3Error(`an error occurred during head bucket ${bucket}, ${s3Error.message}`);
     }
   }
 
   private async headObjectWrapper(bucket: string, key: string): Promise<HeadObjectCommandOutput | undefined> {
-    this.logger.info(`initializing head object command with key ${key} in bucket ${bucket}`);
+    this.logger.debug({ msg: 'heading object', key, bucketName: bucket });
 
     try {
       const command = new HeadObjectCommand({ Bucket: bucket, Key: key });
@@ -65,7 +66,8 @@ export class S3ClientWrapper {
       if (s3Error.name === S3_NOT_FOUND_ERROR_NAME) {
         return undefined;
       }
-      this.logger.error(s3Error);
+
+      this.logger.error({ err: s3Error, msg: 'failed to head objcet', bucketName: bucket, key });
       throw new S3Error(`an error occurred during head object with bucket ${bucket} key ${key}, ${s3Error.message}`);
     }
   }

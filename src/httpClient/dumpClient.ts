@@ -19,7 +19,8 @@ export class DumpServerClient extends BaseClient {
 
   public async postDumpMetadata(dumpServerConfig: DumpServerConfig, body: DumpMetadataCreationBody): Promise<HttpResponse<string>> {
     const { dumpServerEndpoint: endpoint, dumpServerToken: token } = dumpServerConfig;
-    this.logger.info(`invoking POST to ${endpoint}/${DUMP_METADATA_ENDPOINT}`);
+
+    this.logger.info({ msg: 'invoking http request POST', url: `${endpoint}/${DUMP_METADATA_ENDPOINT}` });
 
     const headers: Record<string, string> = {};
     if (token !== undefined) {
@@ -28,7 +29,7 @@ export class DumpServerClient extends BaseClient {
 
     const funcRef = this.httpClient.post.bind(this.httpClient);
 
-    return this.invokeHttp<DumpMetadataCreationBody, string, AxiosRequestArgsWithData<DumpMetadataCreationBody>, typeof funcRef>(
+    return this.invokeHttp<string, DumpMetadataCreationBody, AxiosRequestArgsWithData<DumpMetadataCreationBody>, typeof funcRef>(
       funcRef,
       DUMP_METADATA_ENDPOINT,
       body,
