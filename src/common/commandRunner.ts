@@ -43,7 +43,7 @@ export class CommandRunner {
 
     readline.createInterface(stderrClonedForLogging).on('line', (line) => {
       if (line.length > 0) {
-        this.logger.info(line);
+        this.logger.info({ msg: line, executable, command });
       }
     });
 
@@ -62,8 +62,7 @@ export class CommandRunner {
     const globalArgs = this.globalCommandArgs[executable];
     const args = command != undefined ? [command, ...globalArgs, ...commandArgs] : [...globalArgs, ...commandArgs];
 
-    const prettyArgs = args.join(' ');
-    this.logger.debug(`running command: ${executable} ${prettyArgs}`);
+    this.logger.debug({ msg: 'spawning new process', executable, args });
 
     return spawn(executable, args);
   }

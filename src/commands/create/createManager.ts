@@ -36,41 +36,31 @@ export class CreateManager {
   }
 
   public async createPgDump(dumpTableName: string): Promise<string> {
-    this.logger.info('creating pg dump');
+    this.logger.info({ msg: 'creating pg dump', dumpTableName });
 
     const executable: Executable = 'pg_dump';
     const pgDumpOutputPath = join(PG_DUMPS_PATH, dumpTableName);
     const args = ['--format=custom', `--file=${pgDumpOutputPath}`];
 
-    const { exitCode } = await this.commandRunner.run(executable, undefined, args);
-
-    if (exitCode !== 0) {
-      this.logger.error(`${executable} exit with code ${exitCode as number}`);
-      throw new PgDumpError(`an error occurred while running ${executable}, exit code ${exitCode as number}`);
-    }
+    await this.commandWrapper(executable, args, PgDumpError);
 
     return pgDumpOutputPath;
   }
 
   public async createOsmDump(pgDumpFilePath: string, osmDumpName: string): Promise<string> {
-    this.logger.info('creating ng dump');
+    this.logger.info({ msg: 'creating ng dump', osmDumpName, pgDumpFilePath });
 
     const executable: Executable = 'planet-dump-ng';
     const osmDumpOutputPath = join(NG_DUMPS_PATH, osmDumpName);
     const args = [`--dump-file=${pgDumpFilePath}`, `--pbf=${osmDumpOutputPath}`];
 
-    const { exitCode } = await this.commandRunner.run(executable, undefined, args);
-
-    if (exitCode !== 0) {
-      this.logger.error(`${executable} exit with code ${exitCode as number}`);
-      throw new PlanetDumpNgError(`an error occurred while running ${executable}, exit code ${exitCode as number}`);
-    }
+    await this.commandWrapper(executable, args, PlanetDumpNgError);
 
     return osmDumpOutputPath;
   }
 
   public async uploadFileToS3(filePath: string, bucketName: string, key: string, acl: string): Promise<void> {
-    this.logger.info(`strating the upload of file ${filePath} as key ${key} to s3 bucket ${bucketName}`);
+    this.logger.info({ msg: 'uploading file to bucket', bucketName, filePath, key, acl });
 
     if (!(await this.s3Client.validateExistance('bucket', bucketName))) {
       throw new BucketDoesNotExistError('the specified bucket does not exist');
@@ -86,8 +76,23 @@ export class CreateManager {
   }
 
   public async registerOnDumpServer(dumpServerConfig: DumpServerConfig, dumpMetadata: DumpMetadata): Promise<void> {
-    this.logger.info(`strating the upload of ${dumpMetadata.name} to dump-server`);
+    this.logger.info({
+      msg: 'uploading created dump metadata to dump server',
+      dumpMetadata,
+      dumpServerEndpoint: dumpServerConfig.dumpServerEndpoint,
+    });
 
     await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
+  }
+
+  private async commandWrapper(executable: Executable, args: string[], error: new (message?: string) => Error, command?: string): Promise<void> {
+    this.logger.info({ msg: 'executing command', executable, command, args });
+
+    const { exitCode } = await this.commandRunner.run(executable, command, args);
+
+    if (exitCode !== 0) {
+      this.logger.error({ msg: 'failure occurred during the execute of command', executable, command, args, executableExitCode: exitCode });
+      throw new error(`an error occurred while running ${executable} with ${command ?? 'undefined'} command, exit code ${exitCode as number}`);
+    }
   }
 }

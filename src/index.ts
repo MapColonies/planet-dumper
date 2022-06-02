@@ -1,16 +1,24 @@
 /* eslint-disable import/first */
 // this import must be called before the first import of tsyring
 import 'reflect-metadata';
-import { container } from 'tsyringe';
 import { hideBin } from 'yargs/helpers';
-import { ExitCodes, EXIT_CODE, ON_SIGNAL } from './common/constants';
+import { Logger } from '@map-colonies/js-logger';
+import { ExitCodes, EXIT_CODE, ON_SIGNAL, SERVICES } from './common/constants';
 import { getCli } from './cli';
 
-void getCli()
+const [cli, container] = getCli();
+void cli
   .parseAsync(hideBin(process.argv))
   .catch((error: Error) => {
-    console.error('failed initializing the cli');
-    console.error(error.message);
+    let logFunction;
+    if (container.isRegistered(SERVICES.LOGGER)) {
+      const logger = container.resolve<Logger>(SERVICES.LOGGER);
+      logFunction = logger.error.bind(logger);
+    } else {
+      logFunction = console.error;
+    }
+
+    logFunction({ msg: '😢 - failed initializing the server', err: error });
   })
   .finally(() => {
     const shutDown: () => Promise<void> = container.resolve(ON_SIGNAL);

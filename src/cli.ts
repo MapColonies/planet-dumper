@@ -1,8 +1,10 @@
 import { Argv } from 'yargs';
+import { DependencyContainer } from 'tsyringe';
 import { registerExternalValues, RegisterOptions } from './containerConfig';
 import { CLI_BUILDER } from './common/constants';
 
-export const getCli = (registerOptions?: RegisterOptions): Argv => {
+export const getCli = (registerOptions?: RegisterOptions): [Argv, DependencyContainer] => {
   const container = registerExternalValues(registerOptions);
-  return container.resolve<Argv>(CLI_BUILDER);
+  const argv = container.resolve<Argv>(CLI_BUILDER);
+  return [argv, container];
 };
