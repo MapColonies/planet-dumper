@@ -1,6 +1,7 @@
 /* eslint-disable import/first */
 // this import must be called before the first import of tsyring
 import 'reflect-metadata';
+import './common/tracing';
 import { hideBin } from 'yargs/helpers';
 import { Logger } from '@map-colonies/js-logger';
 import { ExitCodes, EXIT_CODE, ON_SIGNAL, SERVICES } from './common/constants';
