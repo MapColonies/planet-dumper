@@ -32,6 +32,15 @@ Options:
   -p, --dumpNamePrefix, --dump-name-prefix  The result dump name prefix [string]
   -t, --dumpNameTimestamp,                  Add timestamp to the resulting dump
   --dump-name-timestamp                     name      [boolean] [default: false]
+  --sbn, --stateBucketName,                 Determines state seqeunce number
+  --state-bucket-name                       according to this bucket state file,
+                                            locks the bucket until creation
+                                            completes                   [string]
+  --isn, --includeState,                    Will include the state seqeunce
+  --include-state                           number located in given
+                                            state-bucket-name and apply it on
+                                            the resulting dump metadata
+                                                    [boolean] [default: true]
 ```
 
 ## Cli Environment Variables
@@ -78,6 +87,7 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 | 104              | object key already exists | the created dump has an object key which does already exist on the bucket.      |
 | 105              | remote service response error | remote service responded with an error.                                     |
 | 106              | remote service unavailable    | could not reach to remote service.                                          |
+| 107              | invalid state error       | state file located in s3 is invalid.                                            |
 
 ## Building and Running
 

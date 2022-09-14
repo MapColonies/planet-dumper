@@ -1,3 +1,4 @@
+import fsPromises from 'fs/promises'
 import { Argv, CommandModule, Arguments } from 'yargs';
 import { isWebUri } from 'valid-url';
 import { Logger } from '@map-colonies/js-logger';
@@ -5,10 +6,10 @@ import { container, delay, inject, injectable } from 'tsyringe';
 import { S3Client } from '@aws-sdk/client-s3';
 import { ExitCodes, EXIT_CODE, PG_DUMP_FILE_FORMAT, S3_REGION, SERVICES } from '../../common/constants';
 import { ErrorWithExitCode } from '../../common/errors';
-import { DumpNameOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
+import { DumpMetadataOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
 import { CreateManager } from './createManager';
 
-export type CreateArguments = S3Config & DumpNameOptions & DumpServerConfig;
+export type CreateArguments = S3Config & DumpMetadataOptions & DumpServerConfig;
 
 @injectable()
 export class CreateCommand implements CommandModule<Argv, CreateArguments> {
@@ -68,8 +69,31 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         type: 'boolean',
         default: false,
       })
+      .option('stateBucketName', {
+        alias: ['sbn', 'state-bucket-name'],
+        description: 'Determines state seqeunce number according to this bucket state file, locks the bucket until creation completes',
+        nargs: 1,
+        type: 'string',
+      })
+      .option('includeState', {
+        alias: ['isn', 'include-state'],
+        description: 'Will include the state seqeunce number located in given state-bucket-name and apply it on the resulting dump metadata',
+        nargs: 1,
+        type: 'boolean',
+        default: true
+      })
       .check((argv) => {
-        const { dumpServerEndpoint } = argv;
+        const { includeState, stateBucketName, dumpServerEndpoint } = argv;
+
+        if (includeState && stateBucketName === undefined) {
+          this.logger.error({
+            msg: 'argument validation failure',
+            command: this.command,
+            argument: 'state-bucket-name',
+            received: stateBucketName,
+          });
+          throw new Error(`state-bucket-name is required when include-state is true`);
+        }
 
         if (dumpServerEndpoint !== undefined && isWebUri(dumpServerEndpoint) === undefined) {
           this.logger.error({
@@ -80,6 +104,7 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
           });
           throw new Error(`provided dump-server-endpoint ${dumpServerEndpoint} is not a valid web uri`);
         }
+
         return true;
       })
       .middleware((argv) => {
@@ -95,20 +120,34 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
   };
 
   public handler = async (args: Arguments<CreateArguments>): Promise<void> => {
-    const { awsSecretAccessKey, awsAccessKeyId, pgpassword, pguser, ...restOfArgs } = args;
+    const { awsSecretAccessKey, awsAccessKeyId, pgpassword, pguser, dumpServerToken, ...restOfArgs } = args;
     this.logger.debug({ msg: 'starting command execution', command: this.command, args: restOfArgs });
 
-    const { dumpName, dumpNamePrefix, dumpNameTimestamp, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerToken } = restOfArgs;
+    const { stateBucketName, includeState, dumpName, dumpNamePrefix, dumpNameTimestamp, s3BucketName, s3Acl, dumpServerEndpoint } = restOfArgs;
+
+    let isS3Locked = false;
 
     try {
-      const dumpMetadata = this.manager.buildDumpMetadata({ dumpName, dumpNamePrefix, dumpNameTimestamp }, s3BucketName);
+      if (stateBucketName) {
+        await this.manager.lockS3(stateBucketName);
+        isS3Locked = true;
+      }
+
+      const dumpMetadata = await this.manager.buildDumpMetadata({ stateBucketName, includeState, dumpName, dumpNamePrefix, dumpNameTimestamp }, s3BucketName);
 
       const pgDumpName = `${dumpMetadata.name}.${PG_DUMP_FILE_FORMAT}`;
       const pgDumpPath = await this.manager.createPgDump(pgDumpName);
 
       const osmDumpPath = await this.manager.createOsmDump(pgDumpPath, dumpMetadata.name);
 
-      await this.manager.uploadFileToS3(osmDumpPath, s3BucketName, dumpMetadata.name, s3Acl);
+      const dumpBuffer = await fsPromises.readFile(osmDumpPath);
+      await this.manager.uploadBufferToS3(dumpBuffer, s3BucketName, dumpMetadata.name, s3Acl);
+
+      if (stateBucketName) {
+        await this.manager.unlockS3(stateBucketName);
+        isS3Locked = false;
+      }
+
       if (dumpServerEndpoint) {
         await this.manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerToken }, dumpMetadata);
       }
@@ -123,6 +162,10 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
 
       container.register(EXIT_CODE, { useValue: exitCode });
       this.logger.error({ err: error, msg: 'an error occurred while executing command', command: this.command, exitCode });
+
+      if (isS3Locked) {
+        await this.manager.unlockS3(stateBucketName);
+      }
     }
   };
 }

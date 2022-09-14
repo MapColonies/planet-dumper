@@ -3,6 +3,13 @@ export interface IConfig {
   has: (setting: string) => boolean;
 }
 
+export type DumpMetadataOptions = DumpStateOptions & DumpNameOptions;
+
+export interface DumpStateOptions {
+  includeState: boolean;
+  stateBucketName: string;
+}
+
 export interface DumpNameOptions {
   dumpNamePrefix?: string;
   dumpName: string;
@@ -33,4 +40,5 @@ export interface DumpMetadata {
   name: string;
   bucket?: string;
   timestamp: Date;
+  sequenceNumber?: number;
 }
