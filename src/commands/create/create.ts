@@ -1,4 +1,4 @@
-import fsPromises from 'fs/promises'
+import fsPromises from 'fs/promises';
 import { Argv, CommandModule, Arguments } from 'yargs';
 import { isWebUri } from 'valid-url';
 import { Logger } from '@map-colonies/js-logger';
@@ -49,25 +49,12 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         nargs: 1,
         type: 'string',
       })
-      .option('dumpName', {
-        alias: ['n', 'dump-name'],
-        description: 'The result dump name',
+      .option('dumpNameFormat', {
+        alias: ['n', 'dump-name-format'],
+        description: 'The resulting dump name format, example: prefix_{timestamp}_{sequenceNumber}.pbf',
         nargs: 1,
         type: 'string',
         demandOption: true,
-      })
-      .option('dumpNamePrefix', {
-        alias: ['p', 'dump-name-prefix'],
-        description: 'The result dump name prefix',
-        nargs: 1,
-        type: 'string',
-      })
-      .option('dumpNameTimestamp', {
-        alias: ['t', 'dump-name-timestamp'],
-        description: 'Add timestamp to the resulting dump name',
-        nargs: 1,
-        type: 'boolean',
-        default: false,
       })
       .option('stateBucketName', {
         alias: ['sbn', 'state-bucket-name'],
@@ -76,11 +63,11 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         type: 'string',
       })
       .option('includeState', {
-        alias: ['isn', 'include-state'],
+        alias: ['is', 'include-state'],
         description: 'Will include the state seqeunce number located in given state-bucket-name and apply it on the resulting dump metadata',
         nargs: 1,
         type: 'boolean',
-        default: true
+        default: true,
       })
       .check((argv) => {
         const { includeState, stateBucketName, dumpServerEndpoint } = argv;
@@ -120,10 +107,11 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
   };
 
   public handler = async (args: Arguments<CreateArguments>): Promise<void> => {
-    const { awsSecretAccessKey, awsAccessKeyId, pgpassword, pguser, dumpServerToken, ...restOfArgs } = args;
+    const { awsSecretAccessKey, awsAccessKeyId, pgpassword, pguser, dumpServerToken, tkn, ...restOfArgs } = args;
+    args['dump-server-token-secret'] = undefined;
     this.logger.debug({ msg: 'starting command execution', command: this.command, args: restOfArgs });
 
-    const { stateBucketName, includeState, dumpName, dumpNamePrefix, dumpNameTimestamp, s3BucketName, s3Acl, dumpServerEndpoint } = restOfArgs;
+    const { stateBucketName, includeState, dumpNameFormat, s3BucketName, s3Acl, dumpServerEndpoint } = restOfArgs;
 
     let isS3Locked = false;
 
@@ -133,7 +121,7 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         isS3Locked = true;
       }
 
-      const dumpMetadataOptions: DumpMetadataOptions = { stateBucketName, includeState, dumpName, dumpNamePrefix, dumpNameTimestamp };
+      const dumpMetadataOptions: DumpMetadataOptions = { stateBucketName, includeState, dumpNameFormat };
       const dumpMetadata = await this.manager.buildDumpMetadata(dumpMetadataOptions, s3BucketName);
 
       const pgDumpName = `${dumpMetadata.name}.${PG_DUMP_FILE_FORMAT}`;

@@ -11,9 +11,7 @@ export interface DumpStateOptions {
 }
 
 export interface DumpNameOptions {
-  dumpNamePrefix?: string;
-  dumpName: string;
-  dumpNameTimestamp: boolean;
+  dumpNameFormat: string;
 }
 
 export interface S3Config {

@@ -37,5 +37,5 @@ export const NG_DUMPS_PATH = '/tmp';
 export const PBF_FILE_FORMAT = 'pbf';
 export const PG_DUMP_FILE_FORMAT = 'dmp';
 export const S3_LOCK_FILE_NAME = 'lockfile';
-export const STATE_FILE_NAME = 'state.txt'
+export const STATE_FILE_NAME = 'state.txt';
 export const SEQUENCE_NUMBER_REGEX = /sequenceNumber=\d+/;

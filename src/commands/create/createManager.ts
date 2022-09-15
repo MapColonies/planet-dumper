@@ -1,12 +1,13 @@
 import { join } from 'path';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
-import { NG_DUMPS_PATH, PBF_FILE_FORMAT, PG_DUMPS_PATH, S3_LOCK_FILE_NAME, SERVICES, STATE_FILE_NAME } from '../../common/constants';
+import Format from 'string-format';
+import { NG_DUMPS_PATH, PG_DUMPS_PATH, S3_LOCK_FILE_NAME, SERVICES, STATE_FILE_NAME } from '../../common/constants';
 import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
 import { CommandRunner } from '../../common/commandRunner';
 import { BucketDoesNotExistError, InvalidStateFileError, ObjectKeyAlreadyExistError, PgDumpError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpMetadataOptions, DumpNameOptions, DumpServerConfig } from '../../common/interfaces';
+import { DumpMetadata, DumpMetadataOptions, DumpServerConfig } from '../../common/interfaces';
 import { Executable } from '../../common/types';
 import { fetchSequenceNumber, streamToString } from '../../common/util';
 
@@ -24,17 +25,21 @@ export class CreateManager {
   }
 
   public async buildDumpMetadata(dumpMetadataOptions: DumpMetadataOptions, bucketName: string): Promise<DumpMetadata> {
-    const { includeState, stateBucketName, ...dumpNameOptions } = dumpMetadataOptions;
+    const { stateBucketName, dumpNameFormat, includeState } = dumpMetadataOptions;
 
-    const name = this.constructDumpName(dumpNameOptions);
+    const sequenceNumber = await this.getSequenceNumber(stateBucketName);
+
+    const metadata = { timestamp: this.creationTimestamp.toISOString(), sequenceNumber };
+
+    const name = Format(dumpNameFormat, metadata);
+
     let dumpMetadata: DumpMetadata = {
       name,
       bucket: bucketName,
       timestamp: this.creationTimestamp,
-    }
+    };
 
     if (includeState) {
-      const sequenceNumber = await this.getSequenceNumber(stateBucketName);
       dumpMetadata = { ...dumpMetadata, sequenceNumber };
     }
 
@@ -110,18 +115,6 @@ export class CreateManager {
     });
 
     await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
-  }
-
-  private constructDumpName(dumpNameOptions: DumpNameOptions): string {
-    const { dumpNamePrefix, dumpName, dumpNameTimestamp } = dumpNameOptions;
-
-    let name = dumpNamePrefix !== undefined ? `${dumpNamePrefix}_${dumpName}` : dumpName;
-
-    if (dumpNameTimestamp) {
-      name += `_${this.creationTimestamp.toISOString()}`;
-    }
-
-    return `${name}.${PBF_FILE_FORMAT}`;
   }
 
   private async commandWrapper(executable: Executable, args: string[], error: new (message?: string) => Error, command?: string): Promise<void> {

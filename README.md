@@ -27,20 +27,18 @@ Options:
   --dump-server-endpoint                                                [string]
       --dumpServerToken, --tkn,             The token of the dump-server used
       --dump-server-token                   for upload                  [string]
-  -n, --dumpName, --dump-name               The result dump name
-                                                             [string] [required]
-  -p, --dumpNamePrefix, --dump-name-prefix  The result dump name prefix [string]
-  -t, --dumpNameTimestamp,                  Add timestamp to the resulting dump
-  --dump-name-timestamp                     name      [boolean] [default: false]
-  --sbn, --stateBucketName,                 Determines state seqeunce number
-  --state-bucket-name                       according to this bucket state file,
+  -n, --dumpNameFormat, --dump-name-format  The resulting dump name format,
+                                            example: prefix_{timestamp}_{sequenc
+                                            eNumber}.pbf     [string] [required]
+      --stateBucketName, --sbn,             Determines state seqeunce number
+      --state-bucket-name                   according to this bucket state file,
                                             locks the bucket until creation
                                             completes                   [string]
-  --isn, --includeState,                    Will include the state seqeunce
-  --include-state                           number located in given
+      --includeState, --is,                 Will include the state seqeunce
+      --include-state                       number located in given
                                             state-bucket-name and apply it on
                                             the resulting dump metadata
-                                                    [boolean] [default: true]
+                                                       [boolean] [default: true]
 ```
 
 ## Cli Environment Variables
