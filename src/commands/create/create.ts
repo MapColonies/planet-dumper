@@ -133,20 +133,21 @@ export class CreateCommand implements CommandModule<Argv, CreateArguments> {
         isS3Locked = true;
       }
 
-      const dumpMetadata = await this.manager.buildDumpMetadata({ stateBucketName, includeState, dumpName, dumpNamePrefix, dumpNameTimestamp }, s3BucketName);
+      const dumpMetadataOptions: DumpMetadataOptions = { stateBucketName, includeState, dumpName, dumpNamePrefix, dumpNameTimestamp };
+      const dumpMetadata = await this.manager.buildDumpMetadata(dumpMetadataOptions, s3BucketName);
 
       const pgDumpName = `${dumpMetadata.name}.${PG_DUMP_FILE_FORMAT}`;
       const pgDumpPath = await this.manager.createPgDump(pgDumpName);
+
+      if (isS3Locked) {
+        await this.manager.unlockS3(stateBucketName);
+        isS3Locked = false;
+      }
 
       const osmDumpPath = await this.manager.createOsmDump(pgDumpPath, dumpMetadata.name);
 
       const dumpBuffer = await fsPromises.readFile(osmDumpPath);
       await this.manager.uploadBufferToS3(dumpBuffer, s3BucketName, dumpMetadata.name, s3Acl);
-
-      if (stateBucketName) {
-        await this.manager.unlockS3(stateBucketName);
-        isS3Locked = false;
-      }
 
       if (dumpServerEndpoint) {
         await this.manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerToken }, dumpMetadata);
