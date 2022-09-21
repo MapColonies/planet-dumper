@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/naming-convention */ // s3-client object commands arguments
-import { Readable } from 'stream';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
 import {
@@ -10,6 +9,8 @@ import {
   HeadBucketCommandOutput,
   PutObjectCommand,
   ObjectCannedACL,
+  GetObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { S3Error } from '../common/errors';
 import { S3_NOT_FOUND_ERROR_NAME, SERVICES } from '../common/constants';
@@ -20,7 +21,21 @@ type HeadCommandType = 'bucket' | 'object';
 export class S3ClientWrapper {
   public constructor(@inject(SERVICES.LOGGER) private readonly logger: Logger, @inject(SERVICES.S3) private readonly s3Client: S3Client) {}
 
-  public async putObjectWrapper(bucket: string, key: string, body: Readable, acl?: ObjectCannedACL | string): Promise<void> {
+  public async getObjectWrapper(bucketName: string, key: string): Promise<NodeJS.ReadStream> {
+    this.logger.debug({ msg: 'getting object from s3', key, bucketName });
+
+    try {
+      const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
+      const commandOutput = await this.s3Client.send(command);
+      return commandOutput.Body as NodeJS.ReadStream;
+    } catch (error) {
+      const s3Error = error as Error;
+      this.logger.error({ err: s3Error, msg: 'failed getting key from bucket', key, bucketName });
+      throw new S3Error(`an error occurred during the get of key ${key} from bucket ${bucketName}, ${s3Error.message}`);
+    }
+  }
+
+  public async putObjectWrapper(bucket: string, key: string, body: Buffer, acl?: ObjectCannedACL | string): Promise<void> {
     this.logger.debug({ msg: 'putting key in bucket', key, bucketName: bucket, acl });
 
     try {
@@ -31,6 +46,23 @@ export class S3ClientWrapper {
       this.logger.error({ err: s3Error, msg: 'failed putting key in bucket', acl, bucketName: bucket });
       throw new S3Error(`an error occurred during the put of key ${key} on bucket ${bucket}, ${s3Error.message}`);
     }
+  }
+
+  public async deleteObjectWrapper(bucketName: string, key: string): Promise<boolean> {
+    this.logger.debug({ msg: 'deleting object from s3', key, bucketName });
+
+    let hasSucceeded = true;
+
+    try {
+      const command = new DeleteObjectCommand({ Bucket: bucketName, Key: key });
+      await this.s3Client.send(command);
+    } catch (error) {
+      const s3Error = error as Error;
+      this.logger.error({ err: s3Error, msg: 'failed deleting key from bucket', key, bucketName });
+      hasSucceeded = false;
+    }
+
+    return hasSucceeded;
   }
 
   public async validateExistance(type: HeadCommandType, value: string, bucket?: string): Promise<boolean> {
