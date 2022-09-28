@@ -56,3 +56,10 @@ export class HttpUpstreamResponseError extends ErrorWithExitCode {
     Object.setPrototypeOf(this, HttpUpstreamResponseError.prototype);
   }
 }
+
+export class InvalidStateFileError extends ErrorWithExitCode {
+  public constructor(message?: string) {
+    super(message, ExitCodes.INVALID_STATE_FILE_ERROR);
+    Object.setPrototypeOf(this, InvalidStateFileError.prototype);
+  }
+}

@@ -27,11 +27,18 @@ Options:
   --dump-server-endpoint                                                [string]
       --dumpServerToken, --tkn,             The token of the dump-server used
       --dump-server-token                   for upload                  [string]
-  -n, --dumpName, --dump-name               The result dump name
-                                                             [string] [required]
-  -p, --dumpNamePrefix, --dump-name-prefix  The result dump name prefix [string]
-  -t, --dumpNameTimestamp,                  Add timestamp to the resulting dump
-  --dump-name-timestamp                     name      [boolean] [default: false]
+  -n, --dumpNameFormat, --dump-name-format  The resulting dump name format,
+                                            example: prefix_{timestamp}_{sequenc
+                                            eNumber}.pbf     [string] [required]
+      --stateBucketName, --sbn,             Determines state seqeunce number
+      --state-bucket-name                   according to this bucket state file,
+                                            locks the bucket until creation
+                                            completes                   [string]
+      --includeState, --is,                 Will include the state seqeunce
+      --include-state                       number located in given
+                                            state-bucket-name and apply it on
+                                            the resulting dump metadata
+                                                       [boolean] [default: true]
 ```
 
 ## Cli Environment Variables
@@ -78,6 +85,7 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 | 104              | object key already exists | the created dump has an object key which does already exist on the bucket.      |
 | 105              | remote service response error | remote service responded with an error.                                     |
 | 106              | remote service unavailable    | could not reach to remote service.                                          |
+| 107              | invalid state error       | state file located in s3 is invalid.                                            |
 
 ## Building and Running
 

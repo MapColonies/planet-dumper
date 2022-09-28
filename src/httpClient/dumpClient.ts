@@ -7,8 +7,9 @@ import { AxiosRequestArgsWithData, BaseClient, HttpResponse } from './baseClient
 
 const DUMP_METADATA_ENDPOINT = 'dumps';
 
-export interface DumpMetadataCreationBody extends Required<DumpMetadata> {
+export interface DumpMetadataCreationBody extends Required<Omit<DumpMetadata, 'sequenceNumber'>> {
   description?: string;
+  sequenceNumber?: number;
 }
 
 @injectable()
