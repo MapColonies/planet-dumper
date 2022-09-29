@@ -43,7 +43,7 @@ export class S3ClientWrapper {
       await this.s3Client.send(command);
     } catch (error) {
       const s3Error = error as Error;
-      this.logger.error({ err: s3Error, msg: 'failed putting key in bucket', acl, bucketName: bucket });
+      this.logger.error({ err: s3Error, msg: 'failed putting key in bucket', acl, bucketName: bucket, key });
       throw new S3Error(`an error occurred during the put of key ${key} on bucket ${bucket}, ${s3Error.message}`);
     }
   }
