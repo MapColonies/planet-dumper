@@ -8,6 +8,13 @@ export class ErrorWithExitCode extends Error {
   }
 }
 
+export class CheckError extends Error {
+  public constructor(message: string, public argument: string, public received?: unknown) {
+    super(message);
+    Object.setPrototypeOf(this, CheckError.prototype);
+  }
+}
+
 export class PgDumpError extends ErrorWithExitCode {
   public constructor(message?: string) {
     super(message, ExitCodes.PG_DUMP_ERROR);

@@ -7,7 +7,7 @@ export type DumpMetadataOptions = DumpStateOptions & DumpNameOptions;
 
 export interface DumpStateOptions {
   includeState: boolean;
-  stateBucketName: string;
+  stateBucketName?: string;
 }
 
 export interface DumpNameOptions {
@@ -30,8 +30,8 @@ export interface PgDumpConfig {
 }
 
 export interface DumpServerConfig {
-  dumpServerEndpoint: string;
-  dumpServerToken?: string;
+  dumpServerEndpoint?: string;
+  dumpServerHeaders: string[];
 }
 
 export interface DumpMetadata {

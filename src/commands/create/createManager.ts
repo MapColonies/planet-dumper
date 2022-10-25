@@ -11,6 +11,8 @@ import { DumpMetadata, DumpMetadataOptions, DumpServerConfig } from '../../commo
 import { Executable } from '../../common/types';
 import { fetchSequenceNumber, streamToString } from '../../common/util';
 
+export const CREATE_MANAGER_FACTORY = Symbol('CreateManagerFactory');
+
 @injectable()
 export class CreateManager {
   private readonly creationTimestamp: Date;
@@ -27,11 +29,7 @@ export class CreateManager {
   public async buildDumpMetadata(dumpMetadataOptions: DumpMetadataOptions, bucketName: string): Promise<DumpMetadata> {
     const { stateBucketName, dumpNameFormat, includeState } = dumpMetadataOptions;
 
-    const sequenceNumber = await this.getSequenceNumber(stateBucketName);
-
-    const metadata = { timestamp: this.creationTimestamp.toISOString(), sequenceNumber };
-
-    const name = Format(dumpNameFormat, metadata);
+    const name = Format(dumpNameFormat, { timestamp: this.creationTimestamp.toISOString() });
 
     let dumpMetadata: DumpMetadata = {
       name,
@@ -39,8 +37,8 @@ export class CreateManager {
       timestamp: this.creationTimestamp,
     };
 
-    if (includeState) {
-      dumpMetadata = { ...dumpMetadata, sequenceNumber };
+    if (includeState && stateBucketName !== undefined) {
+      dumpMetadata = { ...dumpMetadata, sequenceNumber: await this.getSequenceNumber(stateBucketName) };
     }
 
     return dumpMetadata;
@@ -84,15 +82,6 @@ export class CreateManager {
     await this.s3Client.deleteObjectWrapper(bucketName, S3_LOCK_FILE_NAME);
   }
 
-  public async getSequenceNumber(bucketName: string): Promise<number> {
-    this.logger.info({ msg: 'getting current sequence sequence number from s3', bucketName });
-
-    const stateStream = await this.s3Client.getObjectWrapper(bucketName, STATE_FILE_NAME);
-    const stateContent = await streamToString(stateStream);
-    const sequenceNumber = this.fetchSequenceNumberSafely(stateContent);
-    return sequenceNumber;
-  }
-
   public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {
     this.logger.info({ msg: 'uploading file to bucket', bucketName, key, acl });
 
@@ -107,11 +96,10 @@ export class CreateManager {
     await this.s3Client.putObjectWrapper(bucketName, key, buffer, acl);
   }
 
-  public async registerOnDumpServer(dumpServerConfig: DumpServerConfig, dumpMetadata: DumpMetadata): Promise<void> {
+  public async registerOnDumpServer(dumpServerConfig: Required<DumpServerConfig>, dumpMetadata: DumpMetadata): Promise<void> {
     this.logger.info({
       msg: 'uploading created dump metadata to dump server',
       dumpMetadata,
-      dumpServerEndpoint: dumpServerConfig.dumpServerEndpoint,
     });
 
     await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
@@ -126,6 +114,14 @@ export class CreateManager {
       this.logger.error({ msg: 'failure occurred during the execute of command', executable, command, args, executableExitCode: exitCode });
       throw new error(`an error occurred while running ${executable} with ${command ?? 'undefined'} command, exit code ${exitCode as number}`);
     }
+  }
+
+  private async getSequenceNumber(bucketName: string): Promise<number> {
+    this.logger.info({ msg: 'getting current sequence sequence number from s3', bucketName });
+
+    const stateStream = await this.s3Client.getObjectWrapper(bucketName, STATE_FILE_NAME);
+    const stateContent = await streamToString(stateStream);
+    return this.fetchSequenceNumberSafely(stateContent);
   }
 
   private fetchSequenceNumberSafely(content: string): number {

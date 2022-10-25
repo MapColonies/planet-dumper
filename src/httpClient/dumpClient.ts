@@ -18,15 +18,16 @@ export class DumpServerClient extends BaseClient {
     super(logger);
   }
 
-  public async postDumpMetadata(dumpServerConfig: DumpServerConfig, body: DumpMetadataCreationBody): Promise<HttpResponse<string>> {
-    const { dumpServerEndpoint: endpoint, dumpServerToken: token } = dumpServerConfig;
+  public async postDumpMetadata(dumpServerConfig: Required<DumpServerConfig>, body: DumpMetadataCreationBody): Promise<HttpResponse<string>> {
+    const { dumpServerEndpoint: endpoint, dumpServerHeaders: headers } = dumpServerConfig;
 
-    this.logger.info({ msg: 'invoking http request POST', url: `${endpoint}/${DUMP_METADATA_ENDPOINT}` });
+    const requestHeaders: Record<string, string> = {};
+    headers.map((headerKeyValue) => {
+      const [key, value] = headerKeyValue.trim().split('=');
+      requestHeaders[key] = value;
+    });
 
-    const headers: Record<string, string> = {};
-    if (token !== undefined) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    this.logger.info({ msg: 'invoking POST http request', url: `${endpoint}/${DUMP_METADATA_ENDPOINT}`, headers: Object.keys(requestHeaders) });
 
     const funcRef = this.httpClient.post.bind(this.httpClient);
 
@@ -36,7 +37,7 @@ export class DumpServerClient extends BaseClient {
       body,
       {
         baseURL: endpoint,
-        headers,
+        headers: requestHeaders,
       }
     );
   }

@@ -25,11 +25,13 @@ Options:
                                                             [default: "private"]
   -s, --dumpServerEndpoint,                 The endpoint of the dump-server
   --dump-server-endpoint                                                [string]
-      --dumpServerToken, --tkn,             The token of the dump-server used
-      --dump-server-token                   for upload                  [string]
+      --dumpServerHeaders, --dsh,           The headers to attach to the
+      --dump-server-headers                 dump-server request
+                                                           [array] [default: []]
   -n, --dumpNameFormat, --dump-name-format  The resulting dump name format,
-                                            example: prefix_{timestamp}_{sequenc
-                                            eNumber}.pbf     [string] [required]
+                                            example:
+                                            prefix_{timestamp}_suffix.pbf
+                                                             [string] [required]
       --stateBucketName, --sbn,             Determines state seqeunce number
       --state-bucket-name                   according to this bucket state file,
                                             locks the bucket until creation
