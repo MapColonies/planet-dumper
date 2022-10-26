@@ -7,7 +7,6 @@ export const IGNORED_OUTGOING_TRACE_ROUTES = [/^.*\/v1\/metrics.*$/];
 export const IGNORED_INCOMING_TRACE_ROUTES = [/^.*\/docs.*$/];
 
 export const CLI_BUILDER = Symbol('cliBuilder');
-export const ON_SIGNAL = Symbol('onSignal');
 export const EXIT_CODE = Symbol('exitCode');
 
 export const SERVICES: Record<string, symbol> = {

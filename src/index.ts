@@ -4,27 +4,36 @@ import 'reflect-metadata';
 import './common/tracing';
 import { hideBin } from 'yargs/helpers';
 import { Logger } from '@map-colonies/js-logger';
-import { ExitCodes, EXIT_CODE, ON_SIGNAL, SERVICES } from './common/constants';
+import { DependencyContainer } from 'tsyringe';
+import { ExitCodes, EXIT_CODE, SERVICES } from './common/constants';
 import { getCli } from './cli';
+import { ShutdownHandler } from './common/shutdownHandler';
 
-const [cli, container] = getCli();
-void cli
-  .parseAsync(hideBin(process.argv))
+let depContainer: DependencyContainer | undefined;
+
+const exitProcess = (): void => {
+  const exitCode = depContainer?.isRegistered(EXIT_CODE) === true ? depContainer.resolve<number>(EXIT_CODE) : ExitCodes.GENERAL_ERROR;
+  process.exit(exitCode);
+};
+
+void getCli()
+  .then(async ([container, cli]) => {
+    depContainer = container;
+    await cli.parseAsync(hideBin(process.argv));
+  })
   .catch((error: Error) => {
-    let logFunction;
-    if (container.isRegistered(SERVICES.LOGGER)) {
-      const logger = container.resolve<Logger>(SERVICES.LOGGER);
-      logFunction = logger.error.bind(logger);
-    } else {
-      logFunction = console.error;
-    }
-
-    logFunction({ msg: '😢 - failed initializing the server', err: error });
+    const errorLogger =
+      depContainer?.isRegistered(SERVICES.LOGGER) === true
+        ? depContainer.resolve<Logger>(SERVICES.LOGGER).error.bind(depContainer.resolve<Logger>(SERVICES.LOGGER))
+        : console.error;
+    errorLogger({ msg: '😢 - failed initializing the server', err: error });
   })
   .finally(() => {
-    const shutDown: () => Promise<void> = container.resolve(ON_SIGNAL);
-    void shutDown().then(() => {
-      const exitCode = container.isRegistered(EXIT_CODE) ? container.resolve<number>(EXIT_CODE) : ExitCodes.GENERAL_ERROR;
-      process.exit(exitCode);
-    });
+    if (depContainer?.isRegistered(ShutdownHandler) === true) {
+      const shutdownHandler = depContainer.resolve(ShutdownHandler);
+      void shutdownHandler.onShutdown().then(() => {
+        exitProcess();
+      });
+    }
+    exitProcess();
   });
