@@ -7,7 +7,7 @@ import { ExitCodes, EXIT_CODE, PG_DUMP_FILE_FORMAT, S3_REGION, SERVICES } from '
 import { CheckError, ErrorWithExitCode } from '../../common/errors';
 import { DumpMetadataOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
 import { CreateManager, CREATE_MANAGER_FACTORY } from './createManager';
-import { CheckFunc, dumpServerUriCheck, headersCheck, stateArgsCheck } from './checks';
+import { CheckFunc, dumpServerUriCheck, httpHeadersCheck, stateArgsCheck } from './checks';
 
 export const CREATE_COMMAND_FACTORY = Symbol('CreateCommandFactory');
 
@@ -62,7 +62,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
         type: 'string',
       })
       .option('dumpServerHeaders', {
-        alias: ['dsh', 'dump-server-headers'],
+        alias: ['H', 'dump-server-headers'],
         description: 'The headers to attach to the dump-server request',
         array: true,
         type: 'string',
@@ -90,7 +90,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       })
       .check(checkWrapper(stateArgsCheck))
       .check(checkWrapper(dumpServerUriCheck))
-      .check(checkWrapper(headersCheck))
+      .check(checkWrapper(httpHeadersCheck))
       .middleware((argv) => {
         const { s3Endpoint } = argv;
         const client = new S3Client({
@@ -127,6 +127,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       const pgDumpPath = await manager.createPgDump(pgDumpName);
 
       if (isS3Locked) {
+        // once s3 is locked we can safely determine stateBucketName has been provided and is not undefined
         await manager.unlockS3(stateBucketName as string);
         isS3Locked = false;
       }
@@ -152,6 +153,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       logger.error({ err: error, msg: 'an error occurred while executing command', command: command, exitCode });
 
       if (isS3Locked) {
+        // once s3 is locked we can safely determine stateBucketName has been provided and is not undefined
         await manager.unlockS3(stateBucketName as string);
       }
     }
