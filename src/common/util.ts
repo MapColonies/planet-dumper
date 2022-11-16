@@ -18,3 +18,12 @@ export const fetchSequenceNumber = (content: string): number => {
 
   return parseInt(matchResult[0].split('=')[1]);
 };
+
+export const parseHeadersArg = (headers: string[]): Record<string, string> => {
+  const requestHeaders: Record<string, string> = {};
+  headers.forEach((headerKeyValue) => {
+    const [key, value] = headerKeyValue.trim().split('=');
+    requestHeaders[key] = value;
+  });
+  return requestHeaders;
+};

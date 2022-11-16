@@ -2,7 +2,7 @@ import { Logger } from '@map-colonies/js-logger';
 import { AxiosInstance } from 'axios';
 import { inject, injectable } from 'tsyringe';
 import { SERVICES } from '../common/constants';
-import { DumpMetadata, DumpServerConfig } from '../common/interfaces';
+import { DumpMetadata } from '../common/interfaces';
 import { AxiosRequestArgsWithData, BaseClient, HttpResponse } from './baseClient';
 
 const DUMP_METADATA_ENDPOINT = 'dumps';
@@ -18,16 +18,8 @@ export class DumpServerClient extends BaseClient {
     super(logger);
   }
 
-  public async postDumpMetadata(dumpServerConfig: Required<DumpServerConfig>, body: DumpMetadataCreationBody): Promise<HttpResponse<string>> {
-    const { dumpServerEndpoint: endpoint, dumpServerHeaders: headers } = dumpServerConfig;
-
-    const requestHeaders: Record<string, string> = {};
-    headers.map((headerKeyValue) => {
-      const [key, value] = headerKeyValue.trim().split('=');
-      requestHeaders[key] = value;
-    });
-
-    this.logger.info({ msg: 'invoking POST http request', url: `${endpoint}/${DUMP_METADATA_ENDPOINT}`, headers: Object.keys(requestHeaders) });
+  public async postDumpMetadata(endpoint: string, body: DumpMetadataCreationBody, headers?: Record<string, string>): Promise<HttpResponse<string>> {
+    this.logger.info({ msg: 'invoking POST http request', url: `${endpoint}/${DUMP_METADATA_ENDPOINT}`, headers: Object.keys(headers ?? {}) });
 
     const funcRef = this.httpClient.post.bind(this.httpClient);
 
@@ -37,7 +29,7 @@ export class DumpServerClient extends BaseClient {
       body,
       {
         baseURL: endpoint,
-        headers: requestHeaders,
+        headers,
       }
     );
   }

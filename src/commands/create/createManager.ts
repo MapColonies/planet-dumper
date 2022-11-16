@@ -7,7 +7,7 @@ import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
 import { CommandRunner } from '../../common/commandRunner';
 import { BucketDoesNotExistError, InvalidStateFileError, ObjectKeyAlreadyExistError, PgDumpError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpMetadataOptions, DumpServerConfig } from '../../common/interfaces';
+import { DumpMetadata, DumpMetadataOptions } from '../../common/interfaces';
 import { Executable } from '../../common/types';
 import { fetchSequenceNumber, streamToString } from '../../common/util';
 
@@ -96,13 +96,16 @@ export class CreateManager {
     await this.s3Client.putObjectWrapper(bucketName, key, buffer, acl);
   }
 
-  public async registerOnDumpServer(dumpServerConfig: Required<DumpServerConfig>, dumpMetadata: DumpMetadata): Promise<void> {
+  public async registerOnDumpServer(dumpServerEndpoint: string, dumpMetadata: DumpMetadata, headers?: Record<string, string>): Promise<void> {
     this.logger.info({
       msg: 'uploading created dump metadata to dump server',
       dumpMetadata,
+      dumpServerEndpoint
     });
 
-    await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
+    const body = { ...dumpMetadata, bucket: dumpMetadata.bucket as string };
+
+    await this.dumpServerClient.postDumpMetadata(dumpServerEndpoint, body, headers);
   }
 
   private async commandWrapper(executable: Executable, args: string[], error: new (message?: string) => Error, command?: string): Promise<void> {

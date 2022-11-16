@@ -12,6 +12,7 @@ import { createCommandFactory, CREATE_COMMAND_FACTORY } from './commands/create/
 import { createManagerFactory } from './commands/create/createManagerFactory';
 import { CREATE_MANAGER_FACTORY } from './commands/create/createManager';
 import { ShutdownHandler } from './common/shutdownHandler';
+import { parseHeadersArg } from './common/util';
 
 export interface RegisterOptions {
   override?: InjectionObject<unknown>[];
@@ -23,7 +24,16 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
 
   try {
     const loggerConfig = config.get<LoggerOptions>('telemetry.logger');
-    const logger = jsLogger({ ...loggerConfig, mixin: getOtelMixin() });
+    const logger = jsLogger({
+      ...loggerConfig,
+      mixin: getOtelMixin(),
+      redact: {
+        paths: ['args.H', 'args.dumpServerHeaders', 'args["dump-server-headers"]'],
+        censor: (headersKeyValArr: string[]) => {
+          return Object.keys(parseHeadersArg(headersKeyValArr));
+        },
+      },
+    });
 
     const axiosClient = axios.create({ timeout: config.get('httpClient.timeout') });
 

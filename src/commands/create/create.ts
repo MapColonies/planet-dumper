@@ -6,6 +6,7 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { ExitCodes, EXIT_CODE, PG_DUMP_FILE_FORMAT, S3_REGION, SERVICES } from '../../common/constants';
 import { CheckError, ErrorWithExitCode } from '../../common/errors';
 import { DumpMetadataOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
+import { parseHeadersArg } from '../../common/util';
 import { CreateManager, CREATE_MANAGER_FACTORY } from './createManager';
 import { CheckFunc, dumpServerUriCheck, httpHeadersCheck, stateArgsCheck } from './checks';
 
@@ -104,11 +105,11 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
   };
 
   const handler = async (args: Arguments<CreateArguments>): Promise<void> => {
-    const { awsSecretAccessKey, awsAccessKeyId, pgpassword, pguser, dumpServerHeaders, ...restOfArgs } = args;
+    const { awsSecretAccessKey, awsAccessKeyId, pgpassword, pguser, ...restOfArgs } = args;
 
     logger.debug({ msg: 'starting command execution', command: command, args: restOfArgs });
 
-    const { stateBucketName, includeState, dumpNameFormat, s3BucketName, s3Acl, dumpServerEndpoint } = restOfArgs;
+    const { stateBucketName, includeState, dumpNameFormat, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerHeaders } = restOfArgs;
 
     let isS3Locked = false;
 
@@ -138,7 +139,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       await manager.uploadBufferToS3(dumpBuffer, s3BucketName, dumpMetadata.name, s3Acl);
 
       if (dumpServerEndpoint !== undefined) {
-        await manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerHeaders }, dumpMetadata);
+        await manager.registerOnDumpServer(dumpServerEndpoint, dumpMetadata, parseHeadersArg(dumpServerHeaders));
       }
 
       logger.info({ msg: 'finished command execution successfully', command: command, dumpMetadata });
