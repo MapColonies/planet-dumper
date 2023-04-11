@@ -2,7 +2,7 @@ import { join } from 'path';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
 import Format from 'string-format';
-import { NG_DUMPS_PATH, PG_DUMPS_PATH, S3_LOCK_FILE_NAME, SERVICES, STATE_FILE_NAME } from '../../common/constants';
+import { NG_DUMPS_PATH, PG_DUMPS_PATH, SERVICES, STATE_FILE_NAME } from '../../common/constants';
 import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
 import { CommandRunner } from '../../common/commandRunner';
@@ -27,7 +27,7 @@ export class CreateManager {
   }
 
   public async buildDumpMetadata(dumpMetadataOptions: DumpMetadataOptions, bucketName: string): Promise<DumpMetadata> {
-    const { stateBucketName, dumpNameFormat, includeState } = dumpMetadataOptions;
+    const { dumpNameFormat, stateBucketName } = dumpMetadataOptions;
 
     const name = Format(dumpNameFormat, { timestamp: this.creationTimestamp.toISOString() });
 
@@ -37,8 +37,9 @@ export class CreateManager {
       timestamp: this.creationTimestamp,
     };
 
-    if (includeState && stateBucketName !== undefined) {
-      dumpMetadata = { ...dumpMetadata, sequenceNumber: await this.getSequenceNumber(stateBucketName) };
+    if (stateBucketName !== undefined) {
+      const sequenceNumber = await this.getSequenceNumber(stateBucketName);
+      dumpMetadata = { ...dumpMetadata, sequenceNumber };
     }
 
     return dumpMetadata;
@@ -66,20 +67,6 @@ export class CreateManager {
     await this.commandWrapper(executable, args, PlanetDumpNgError);
 
     return osmDumpOutputPath;
-  }
-
-  public async lockS3(bucketName: string): Promise<void> {
-    this.logger.info({ msg: 'locking s3 bucket', bucketName, lockFileName: S3_LOCK_FILE_NAME });
-
-    const lockfileBuffer = Buffer.alloc(1, 0);
-
-    await this.uploadBufferToS3(lockfileBuffer, bucketName, S3_LOCK_FILE_NAME, 'public-read');
-  }
-
-  public async unlockS3(bucketName: string): Promise<void> {
-    this.logger.info({ msg: 'unlocking s3 bucket', bucketName, lockFileName: S3_LOCK_FILE_NAME });
-
-    await this.s3Client.deleteObjectWrapper(bucketName, S3_LOCK_FILE_NAME);
   }
 
   public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {

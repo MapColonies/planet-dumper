@@ -1,17 +1,13 @@
+import { MediatorConfig } from "@map-colonies/arstotzka-mediator";
+
 export interface IConfig {
   get: <T>(setting: string) => T;
   has: (setting: string) => boolean;
 }
 
-export type DumpMetadataOptions = DumpStateOptions & DumpNameOptions;
-
-export interface DumpStateOptions {
-  includeState: boolean;
-  stateBucketName?: string;
-}
-
-export interface DumpNameOptions {
+export interface DumpMetadataOptions {
   dumpNameFormat: string;
+  stateBucketName?: string;
 }
 
 export interface S3Config {
@@ -39,4 +35,10 @@ export interface DumpMetadata {
   bucket?: string;
   timestamp: Date;
   sequenceNumber?: number;
+}
+
+export interface ArstotzkaConfig {
+  enabled: boolean;
+  serviceId: string;
+  mediator: MediatorConfig;
 }

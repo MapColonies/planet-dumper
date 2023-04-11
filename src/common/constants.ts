@@ -14,6 +14,7 @@ export const SERVICES: Record<string, symbol> = {
   CONFIG: Symbol('Config'),
   S3: Symbol('S3'),
   HTTP_CLIENT: Symbol('HttpClient'),
+  ARSTOTZKA: Symbol('Arstotzka'),
 };
 
 export const ExitCodes = {
@@ -35,6 +36,6 @@ export const PG_DUMPS_PATH = '/tmp';
 export const NG_DUMPS_PATH = '/tmp';
 export const PBF_FILE_FORMAT = 'pbf';
 export const PG_DUMP_FILE_FORMAT = 'dmp';
-export const S3_LOCK_FILE_NAME = 'lockfile';
 export const STATE_FILE_NAME = 'state.txt';
 export const SEQUENCE_NUMBER_REGEX = /sequenceNumber=\d+/;
+export const DEFAULT_SEQUENCE_NUMBER = 1;

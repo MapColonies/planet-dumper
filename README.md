@@ -36,11 +36,6 @@ Options:
       --state-bucket-name                   according to this bucket state file,
                                             locks the bucket until creation
                                             completes                   [string]
-      --includeState, --is,                 Will include the state seqeunce
-      --include-state                       number located in given
-                                            state-bucket-name and apply it on
-                                            the resulting dump metadata
-                                                       [boolean] [default: true]
 ```
 
 ## Cli Environment Variables
