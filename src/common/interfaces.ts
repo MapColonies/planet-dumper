@@ -1,4 +1,4 @@
-import { MediatorConfig } from "@map-colonies/arstotzka-mediator";
+import { MediatorConfig } from '@map-colonies/arstotzka-mediator';
 
 export interface IConfig {
   get: <T>(setting: string) => T;

@@ -119,7 +119,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       const dumpMetadataOptions: DumpMetadataOptions = { stateBucketName, dumpNameFormat };
       const dumpMetadata = await manager.buildDumpMetadata(dumpMetadataOptions, s3BucketName);
 
-      await mediator?.createAction({ state: dumpMetadata.sequenceNumber ?? DEFAULT_SEQUENCE_NUMBER, metadata: { name: dumpMetadata.name }});
+      await mediator?.createAction({ state: dumpMetadata.sequenceNumber ?? DEFAULT_SEQUENCE_NUMBER, metadata: { name: dumpMetadata.name } });
 
       await mediator?.removeLock();
 
