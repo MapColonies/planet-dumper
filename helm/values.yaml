@@ -1,0 +1,95 @@
+global:
+  cloudProvider: {}
+  tracing: {}
+  metrics: {}
+  environment: {}
+
+enabled: true
+environment: development
+
+jobAnnotations: {}
+podAnnotations: {}
+
+cloudProvider:
+  flavor: openshift
+  dockerRegistryUrl: my-registry-url.io
+
+image:
+  repository: planet-dumper
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: 'v5.1.0-rc1'
+  pullPolicy: Always
+
+job:
+  apiVersion: 'batch/v1' # depends on openshift version batch/v1 or batch/v1beta1
+  restartPolicy: OnFailure
+  ttlSecondsAfterFinished: 60
+  backoffLimit: 6
+
+resources:
+  enabled: false
+  value:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+env:
+  logLevel: info
+  logPrettyPrintEnabled: false
+  tracing:
+    enabled: false
+    url: http://localhost:55681/v1/trace
+    ratio: 1
+  httpClient:
+    timeout: 1000
+  pgDump:
+    verbose: false
+
+postgres:
+  host: localhost
+  username: postgres
+  password: postgres
+  database: openstreetmap
+  # port: 5432
+  sslAuth:
+    enabled: false
+    secretName: secret-name
+    mountPath: '/tmp/certs-postgres'
+
+s3:
+  accessKey: accessKey
+  secretKey: secretKey
+  host: s3Host
+  port: 9000
+  protocol: http
+  bucketName: planet-dumps
+  acl: private
+
+cli:
+  command: 'create'
+  create:
+    dumpNameFormat: dump_{sequenceNumber}_{timestamp}.pbf
+    stateDetermination:
+      enabled: true
+      bucketName: osmdbt
+    dumpServer:
+      enabled: true
+      endpoint: http://dump-server.com
+      attachHeaders: false
+      headers: X-API-KEY=apikey
+
+arstotzka:
+  enabled: false
+  serviceId: id
+  networkCM: arstotzka-network-configmap
+  mediator:
+    timeout: 10000
+    retryStrategy:
+      enabled: false
+      # retries: 3
+      # shouldResetTimeout: false
+      # isExponential: false
+      # delay: 100

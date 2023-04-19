@@ -5,11 +5,25 @@ import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
 import { container, FactoryFunction } from 'tsyringe';
 import { S3Client } from '@aws-sdk/client-s3';
+import Format from 'string-format';
 import { DEFAULT_SEQUENCE_NUMBER, ExitCodes, EXIT_CODE, PG_DUMP_FILE_FORMAT, S3_REGION, SERVICES } from '../../common/constants';
 import { CheckError, ErrorWithExitCode } from '../../common/errors';
-import { ArstotzkaConfig, DumpMetadataOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
+import { ArstotzkaConfig, DumpMetadata, DumpMetadataOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
 import { CreateManager, CREATE_MANAGER_FACTORY } from './createManager';
 import { CheckFunc, dumpServerUriCheck, httpHeadersCheck } from './checks';
+
+const buildDumpMetadata = (format: string, metadata: Partial<DumpMetadata>): DumpMetadata => {
+  const now = new Date();
+  const { sequenceNumber, bucket } = metadata;
+  const name = Format(format, { timestamp: now.toISOString(), sequenceNumber });
+
+  return {
+    name,
+    bucket,
+    timestamp: now,
+    sequenceNumber,
+  };
+};
 
 export const CREATE_COMMAND_FACTORY = Symbol('CreateCommandFactory');
 
@@ -46,7 +60,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       .option('s3Endpoint', { alias: ['e', 's3-endpoint'], describe: 'The s3 endpoint', nargs: 1, type: 'string', demandOption: true })
       .option('s3BucketName', {
         alias: ['b', 's3-bucket-name'],
-        describe: 'The bucket name containing the state and the lua script',
+        describe: 'The bucket the resulting dump will be uploaded to',
         nargs: 1,
         type: 'string',
         demandOption: true,
@@ -79,7 +93,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       })
       .option('stateBucketName', {
         alias: ['sbn', 'state-bucket-name'],
-        description: 'Determines state seqeunce number according to this bucket state file, locks the bucket until creation completes',
+        description: 'Determines state seqeunce number according to this bucket state file',
         nargs: 1,
         type: 'string',
       })
@@ -116,8 +130,12 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
     try {
       await mediator?.reserveAccess();
 
-      const dumpMetadataOptions: DumpMetadataOptions = { stateBucketName, dumpNameFormat };
-      const dumpMetadata = await manager.buildDumpMetadata(dumpMetadataOptions, s3BucketName);
+      let sequenceNumber: number | undefined;
+      if (stateBucketName !== undefined) {
+        sequenceNumber = await manager.getSequenceNumber(stateBucketName);
+      }
+
+      const dumpMetadata = buildDumpMetadata(dumpNameFormat, { bucket: s3BucketName, sequenceNumber });
 
       await mediator?.createAction({ state: dumpMetadata.sequenceNumber ?? DEFAULT_SEQUENCE_NUMBER, metadata: { name: dumpMetadata.name } });
 

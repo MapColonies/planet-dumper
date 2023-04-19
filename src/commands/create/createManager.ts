@@ -1,13 +1,12 @@
 import { join } from 'path';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
-import Format from 'string-format';
 import { NG_DUMPS_PATH, PG_DUMPS_PATH, SERVICES, STATE_FILE_NAME } from '../../common/constants';
 import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
 import { CommandRunner } from '../../common/commandRunner';
 import { BucketDoesNotExistError, InvalidStateFileError, ObjectKeyAlreadyExistError, PgDumpError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpMetadataOptions, DumpServerConfig } from '../../common/interfaces';
+import { DumpMetadata, DumpServerConfig } from '../../common/interfaces';
 import { Executable } from '../../common/types';
 import { fetchSequenceNumber, streamToString } from '../../common/util';
 
@@ -15,35 +14,12 @@ export const CREATE_MANAGER_FACTORY = Symbol('CreateManagerFactory');
 
 @injectable()
 export class CreateManager {
-  private readonly creationTimestamp: Date;
-
   public constructor(
     @inject(SERVICES.LOGGER) private readonly logger: Logger,
     private readonly s3Client: S3ClientWrapper,
     private readonly dumpServerClient: DumpServerClient,
     private readonly commandRunner: CommandRunner
-  ) {
-    this.creationTimestamp = new Date();
-  }
-
-  public async buildDumpMetadata(dumpMetadataOptions: DumpMetadataOptions, bucketName: string): Promise<DumpMetadata> {
-    const { dumpNameFormat, stateBucketName } = dumpMetadataOptions;
-
-    const name = Format(dumpNameFormat, { timestamp: this.creationTimestamp.toISOString() });
-
-    let dumpMetadata: DumpMetadata = {
-      name,
-      bucket: bucketName,
-      timestamp: this.creationTimestamp,
-    };
-
-    if (stateBucketName !== undefined) {
-      const sequenceNumber = await this.getSequenceNumber(stateBucketName);
-      dumpMetadata = { ...dumpMetadata, sequenceNumber };
-    }
-
-    return dumpMetadata;
-  }
+  ) {}
 
   public async createPgDump(dumpTableName: string): Promise<string> {
     this.logger.info({ msg: 'creating pg dump', dumpTableName });
@@ -92,6 +68,14 @@ export class CreateManager {
     await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
   }
 
+  public async getSequenceNumber(bucketName: string): Promise<number> {
+    this.logger.info({ msg: 'getting current sequence sequence number from s3', bucketName });
+
+    const stateStream = await this.s3Client.getObjectWrapper(bucketName, STATE_FILE_NAME);
+    const stateContent = await streamToString(stateStream);
+    return this.fetchSequenceNumberSafely(stateContent);
+  }
+
   private async commandWrapper(executable: Executable, args: string[], error: new (message?: string) => Error, command?: string): Promise<void> {
     this.logger.info({ msg: 'executing command', executable, command, args });
 
@@ -101,14 +85,6 @@ export class CreateManager {
       this.logger.error({ msg: 'failure occurred during the execute of command', executable, command, args, executableExitCode: exitCode });
       throw new error(`an error occurred while running ${executable} with ${command ?? 'undefined'} command, exit code ${exitCode as number}`);
     }
-  }
-
-  private async getSequenceNumber(bucketName: string): Promise<number> {
-    this.logger.info({ msg: 'getting current sequence sequence number from s3', bucketName });
-
-    const stateStream = await this.s3Client.getObjectWrapper(bucketName, STATE_FILE_NAME);
-    const stateContent = await streamToString(stateStream);
-    return this.fetchSequenceNumberSafely(stateContent);
   }
 
   private fetchSequenceNumberSafely(content: string): number {

@@ -3,7 +3,7 @@ This cli is responsible for creating an osm dump file (pbf format) representing 
 
 This is accomplished by using the [planet-dump-ng](https://github.com/zerebubuth/planet-dump-ng) tool against a postgres backup file created with [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html).
 
-**supports versions 12 and 13 of postgres**
+**supports versions 12, 13 and 14 of postgres**
 
 ## Usage
 
@@ -90,7 +90,7 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 - `NODE_VERSION` - the version of node, defaults to 14.
 - `PLANET_DUMP_NG_VERSION` - the version of planet-dump-ng, defaults to v1.2.3
 - `POSTGRESQL_VERSION` - the version of postgresql-client to be installed, by default version 13.
-notice that the postgresql-client version should be determined by your postgresql database version, support is only for versions 12 and 13 of postgres.
+notice that the postgresql-client version should be determined by your postgresql database version, tested on versions 12, 13 and 14 of postgres.
 
 ### Building the container
 
