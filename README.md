@@ -88,7 +88,7 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 
 ### Build argument variables
 - `NODE_VERSION` - the version of node, defaults to 14.
-- `PLANET_DUMP_NG_VERSION` - the version of planet-dump-ng, defaults to v1.2.3
+- `PLANET_DUMP_NG_TAG` - the version of planet-dump-ng, defaults to v1.2.3
 - `POSTGRESQL_VERSION` - the version of postgresql-client to be installed, by default version 13.
 notice that the postgresql-client version should be determined by your postgresql database version, tested on versions 12, 13 and 14 of postgres.
 
@@ -96,7 +96,7 @@ notice that the postgresql-client version should be determined by your postgresq
 
 ```
     docker build \
-    --build-arg PLANET_DUMP_NG_VERSION=v1.2.0 \
+    --build-arg PLANET_DUMP_NG_TAG=v1.2.0 \
     --build-arg POSTGRESQL_VERSION=13 \
     -f ./Dockerfile -t planet-dumper:latest .
 ```
