@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://json.schemastore.org/catalog-info.json
+
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: planet-dumper
+  description: Creating an osm dump file representing the current planet of an openstreetmap database, meaning a snapshot of all the osm elements in a current time. 
+  tags: 
+    - osm
+    - snapshot
+    - typescript
+    - pbf
+spec:
+  type: service
+  lifecycle: production
+  owner: vector-team
+  system: vector-ingestion
+  consumesApis:
+    - dump-server
+  dependsOn:
+    - resource:default/osm-db
