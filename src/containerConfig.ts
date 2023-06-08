@@ -12,6 +12,7 @@ import { createCommandFactory, CREATE_COMMAND_FACTORY } from './commands/create/
 import { createManagerFactory } from './commands/create/createManagerFactory';
 import { CREATE_MANAGER_FACTORY } from './commands/create/createManager';
 import { ShutdownHandler } from './common/shutdownHandler';
+import { ArstotzkaConfig } from './common/interfaces';
 
 export interface RegisterOptions {
   override?: InjectionObject<unknown>[];
@@ -25,6 +26,8 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
     const loggerConfig = config.get<LoggerOptions>('telemetry.logger');
     const logger = jsLogger({ ...loggerConfig, mixin: getOtelMixin() });
 
+    const arstotzkaConfig = config.get<ArstotzkaConfig>('arstotzka');
+
     const axiosClient = axios.create({ timeout: config.get('httpClient.timeout') });
 
     const tracer = trace.getTracer(CLI_NAME);
@@ -37,6 +40,7 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
       { token: SERVICES.CONFIG, provider: { useValue: config } },
       { token: SERVICES.LOGGER, provider: { useValue: logger } },
       { token: SERVICES.TRACER, provider: { useValue: tracer } },
+      { token: SERVICES.ARSTOTZKA, provider: { useValue: arstotzkaConfig } },
       { token: SERVICES.HTTP_CLIENT, provider: { useValue: axiosClient } },
       { token: EXIT_CODE, provider: { useValue: ExitCodes.SUCCESS } },
     ];

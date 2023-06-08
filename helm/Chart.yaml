@@ -1,0 +1,6 @@
+apiVersion: v2
+name: planet-dumper
+description: A Helm chart for planet-dumper job
+type: application
+version: 5.0.0
+appVersion: 5.0.0

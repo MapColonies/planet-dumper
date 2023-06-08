@@ -22,5 +22,19 @@
   },
   "pgDump": {
     "verbose": false
+  },
+  "arstotzka": {
+    "enabled": false,
+    "serviceId": "serviceId",
+    "mediator": {
+      "timeout": 10000,
+      "enableRetryStrategy": false,
+      "actiony": {
+        "url": "http://actiony.com"
+      },
+      "locky": {
+        "url": "http://locky.com"
+      }
+    }
   }
 }

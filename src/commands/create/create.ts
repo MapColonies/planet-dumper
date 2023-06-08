@@ -1,13 +1,29 @@
 import fsPromises from 'fs/promises';
 import { Argv, CommandModule, Arguments } from 'yargs';
 import { Logger } from '@map-colonies/js-logger';
+import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
+import { ActionStatus } from '@map-colonies/arstotzka-common';
 import { container, FactoryFunction } from 'tsyringe';
 import { S3Client } from '@aws-sdk/client-s3';
-import { ExitCodes, EXIT_CODE, PG_DUMP_FILE_FORMAT, S3_REGION, SERVICES } from '../../common/constants';
+import Format from 'string-format';
+import { DEFAULT_SEQUENCE_NUMBER, ExitCodes, EXIT_CODE, PG_DUMP_FILE_FORMAT, S3_REGION, SERVICES } from '../../common/constants';
 import { CheckError, ErrorWithExitCode } from '../../common/errors';
-import { DumpMetadataOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
+import { ArstotzkaConfig, DumpMetadata, DumpMetadataOptions, DumpServerConfig, S3Config } from '../../common/interfaces';
 import { CreateManager, CREATE_MANAGER_FACTORY } from './createManager';
-import { CheckFunc, dumpServerUriCheck, httpHeadersCheck, stateArgsCheck } from './checks';
+import { CheckFunc, dumpServerUriCheck, httpHeadersCheck } from './checks';
+
+const buildDumpMetadata = (format: string, metadata: Partial<DumpMetadata>): DumpMetadata => {
+  const now = new Date();
+  const { sequenceNumber, bucket } = metadata;
+  const name = Format(format, { timestamp: now.toISOString(), sequenceNumber });
+
+  return {
+    name,
+    bucket,
+    timestamp: now,
+    sequenceNumber,
+  };
+};
 
 export const CREATE_COMMAND_FACTORY = Symbol('CreateCommandFactory');
 
@@ -44,7 +60,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       .option('s3Endpoint', { alias: ['e', 's3-endpoint'], describe: 'The s3 endpoint', nargs: 1, type: 'string', demandOption: true })
       .option('s3BucketName', {
         alias: ['b', 's3-bucket-name'],
-        describe: 'The bucket name containing the state and the lua script',
+        describe: 'The bucket the resulting dump will be uploaded to',
         nargs: 1,
         type: 'string',
         demandOption: true,
@@ -77,18 +93,10 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
       })
       .option('stateBucketName', {
         alias: ['sbn', 'state-bucket-name'],
-        description: 'Determines state seqeunce number according to this bucket state file, locks the bucket until creation completes',
+        description: 'Determines state seqeunce number according to this bucket state file',
         nargs: 1,
         type: 'string',
       })
-      .option('includeState', {
-        alias: ['is', 'include-state'],
-        description: 'Will include the state seqeunce number located in given state-bucket-name and apply it on the resulting dump metadata',
-        nargs: 1,
-        type: 'boolean',
-        default: true,
-      })
-      .check(checkWrapper(stateArgsCheck))
       .check(checkWrapper(dumpServerUriCheck))
       .check(checkWrapper(httpHeadersCheck))
       .middleware((argv) => {
@@ -108,29 +116,33 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
 
     logger.debug({ msg: 'starting command execution', command: command, args: restOfArgs });
 
-    const { stateBucketName, includeState, dumpNameFormat, s3BucketName, s3Acl, dumpServerEndpoint } = restOfArgs;
+    const { stateBucketName, dumpNameFormat, s3BucketName, s3Acl, dumpServerEndpoint } = restOfArgs;
 
-    let isS3Locked = false;
+    let mediator: StatefulMediator | undefined;
+
+    const arstotzkaConfig = dependencyContainer.resolve<ArstotzkaConfig>(SERVICES.ARSTOTZKA);
+    if (arstotzkaConfig.enabled) {
+      mediator = new StatefulMediator({ ...arstotzkaConfig.mediator, serviceId: arstotzkaConfig.serviceId, logger });
+    }
 
     const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
 
     try {
+      await mediator?.reserveAccess();
+
+      let sequenceNumber: number | undefined;
       if (stateBucketName !== undefined) {
-        await manager.lockS3(stateBucketName);
-        isS3Locked = true;
+        sequenceNumber = await manager.getSequenceNumber(stateBucketName);
       }
 
-      const dumpMetadataOptions: DumpMetadataOptions = { stateBucketName, includeState, dumpNameFormat };
-      const dumpMetadata = await manager.buildDumpMetadata(dumpMetadataOptions, s3BucketName);
+      const dumpMetadata = buildDumpMetadata(dumpNameFormat, { bucket: s3BucketName, sequenceNumber });
+
+      await mediator?.createAction({ state: dumpMetadata.sequenceNumber ?? DEFAULT_SEQUENCE_NUMBER, metadata: { name: dumpMetadata.name } });
+
+      await mediator?.removeLock();
 
       const pgDumpName = `${dumpMetadata.name}.${PG_DUMP_FILE_FORMAT}`;
       const pgDumpPath = await manager.createPgDump(pgDumpName);
-
-      if (isS3Locked) {
-        // once s3 is locked we can safely determine stateBucketName has been provided and is not undefined
-        await manager.unlockS3(stateBucketName as string);
-        isS3Locked = false;
-      }
 
       const osmDumpPath = await manager.createOsmDump(pgDumpPath, dumpMetadata.name);
 
@@ -141,6 +153,8 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
         await manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerHeaders }, dumpMetadata);
       }
 
+      await mediator?.updateAction({ status: ActionStatus.COMPLETED });
+
       logger.info({ msg: 'finished command execution successfully', command: command, dumpMetadata });
     } catch (error) {
       let exitCode = ExitCodes.GENERAL_ERROR;
@@ -149,13 +163,10 @@ export const createCommandFactory: FactoryFunction<CommandModule<Argv, CreateArg
         exitCode = error.exitCode;
       }
 
+      await mediator?.updateAction({ status: ActionStatus.FAILED, metadata: { error } });
+
       container.register(EXIT_CODE, { useValue: exitCode });
       logger.error({ err: error, msg: 'an error occurred while executing command', command: command, exitCode });
-
-      if (isS3Locked) {
-        // once s3 is locked we can safely determine stateBucketName has been provided and is not undefined
-        await manager.unlockS3(stateBucketName as string);
-      }
     }
   };
 

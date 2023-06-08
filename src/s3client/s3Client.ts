@@ -27,7 +27,7 @@ export class S3ClientWrapper {
     try {
       const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
       const commandOutput = await this.s3Client.send(command);
-      return commandOutput.Body as NodeJS.ReadStream;
+      return commandOutput.Body as unknown as NodeJS.ReadStream;
     } catch (error) {
       const s3Error = error as Error;
       this.logger.error({ err: s3Error, msg: 'failed getting key from bucket', key, bucketName });

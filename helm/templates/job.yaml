@@ -1,0 +1,72 @@
+{{- $releaseName := .Release.Name -}}
+{{- $chartName := include "planet-dumper.name" . -}}
+{{- $cloudProviderFlavor := include "planet-dumper.cloudProviderFlavor" . -}}
+{{- $cloudProviderDockerRegistryUrl := include "planet-dumper.cloudProviderDockerRegistryUrl" . -}}
+{{- $tag := include "planet-dumper.tag" . -}}
+{{- if .Values.enabled -}}
+apiVersion: {{ .Values.job.apiVersion | quote }}
+kind: Job
+metadata:
+  name: {{ $releaseName }}-{{ $chartName }}
+  labels:
+    app: {{ $chartName }}
+    component: {{ $chartName }}
+    environment: {{ include "planet-dumper.environment" . }}
+    release: {{ $releaseName }}
+    {{- include "planet-dumper.labels" . | nindent 4 }}
+{{- with .Values.jobAnnotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  template:
+{{- with .Values.podAnnotations }}
+    metadata:
+      annotations:
+{{ toYaml . | indent 8 }}
+{{- end }}
+    spec:
+      restartPolicy: {{ .Values.job.restartPolicy }}
+      containers:
+        - name: {{ $releaseName }}-{{ $chartName }}-job
+          {{- with .Values.image }}
+          {{- if ne $cloudProviderFlavor "minikube" }}
+          image: {{ $cloudProviderDockerRegistryUrl }}/{{ .repository }}:{{ $tag }}
+          {{- else }}
+          image: {{ .repository }}:{{ $tag }}
+          {{- end }}
+          {{- end }}
+          imagePullPolicy: {{ .pullPolicy }}
+          args:
+            - {{ .Values.cli.command }}
+          envFrom:
+            - configMapRef:
+                name: {{ $releaseName }}-{{ $chartName }}-configmap
+            - configMapRef:
+                name: {{ $releaseName }}-{{ $chartName }}-command-options-configmap
+            - configMapRef:
+                name: {{ $releaseName }}-{{ $chartName }}-arstotzka-configmap
+            {{- if and .Values.arstotzka.enabled .Values.arstotzka.networkCM }}
+            - configMapRef:
+                name: {{ .Values.arstotzka.networkCM }}
+            {{- end }}
+            - secretRef:
+                name: {{ $releaseName }}-{{ $chartName }}-secret
+          {{- if .Values.resources.enabled }}
+          resources:
+            {{- toYaml .Values.resources.value | nindent 16 }}
+          {{- end }}
+          volumeMounts:
+          {{- if .Values.postgres.sslAuth.enabled }}
+            - name: postgres-cert-conf
+              mountPath: {{ .Values.postgres.sslAuth.mountPath }}
+          {{- end }}
+      volumes:
+        {{- if .Values.postgres.sslAuth.enabled }}
+        - name: postgres-cert-conf
+          secret:
+            secretName: {{ .Values.postgres.sslAuth.secretName }}
+        {{- end }}
+{{- end -}}
