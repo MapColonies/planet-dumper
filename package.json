@@ -48,6 +48,7 @@
     "better-ajv-errors": "^1.1.2",
     "concat-stream": "^2.0.0",
     "config": "^3.3.6",
+    "execa": "^5.1.1",
     "reflect-metadata": "^0.1.13",
     "string-format": "^2.0.0",
     "tsyringe": "^4.6.0",

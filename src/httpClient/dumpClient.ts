@@ -14,8 +14,8 @@ export interface DumpMetadataCreationBody extends Required<Omit<DumpMetadata, 's
 
 @injectable()
 export class DumpServerClient extends BaseClient {
-  public constructor(@inject(SERVICES.LOGGER) logger: Logger, @inject(SERVICES.HTTP_CLIENT) private readonly httpClient: AxiosInstance) {
-    super(logger);
+  public constructor(@inject(SERVICES.LOGGER) logger: Logger, @inject(SERVICES.HTTP_CLIENT) axios: AxiosInstance) {
+    super(axios, logger);
   }
 
   public async postDumpMetadata(dumpServerConfig: Required<DumpServerConfig>, body: DumpMetadataCreationBody): Promise<HttpResponse<string>> {
@@ -29,7 +29,7 @@ export class DumpServerClient extends BaseClient {
 
     this.logger.info({ msg: 'invoking POST http request', url: `${endpoint}/${DUMP_METADATA_ENDPOINT}`, headers: Object.keys(requestHeaders) });
 
-    const funcRef = this.httpClient.post.bind(this.httpClient);
+    const funcRef = this.axios.post.bind(this.axios);
 
     return this.invokeHttp<string, DumpMetadataCreationBody, AxiosRequestArgsWithData<DumpMetadataCreationBody>, typeof funcRef>(
       funcRef,

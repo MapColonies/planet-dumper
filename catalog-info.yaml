@@ -4,8 +4,8 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: planet-dumper
-  description: Creating an osm dump file representing the current planet of an openstreetmap database, meaning a snapshot of all the osm elements in a current time. 
-  tags: 
+  description: Creating an osm dump file representing the current planet of an openstreetmap database, meaning a snapshot of all the osm elements in a current time.
+  tags:
     - osm
     - snapshot
     - typescript

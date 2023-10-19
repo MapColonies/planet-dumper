@@ -1,48 +1,78 @@
 import { join } from 'path';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
-import { NG_DUMPS_PATH, PG_DUMPS_PATH, SERVICES, STATE_FILE_NAME } from '../../common/constants';
+import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
+import { DEFAULT_STATE, NG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
 import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
-import { CommandRunner } from '../../common/commandRunner';
-import { BucketDoesNotExistError, InvalidStateFileError, ObjectKeyAlreadyExistError, PgDumpError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpServerConfig } from '../../common/interfaces';
+import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, PlanetDumpNgError } from '../../common/errors';
+import { DumpMetadata, DumpServerConfig, IConfig } from '../../common/interfaces';
 import { Executable } from '../../common/types';
-import { fetchSequenceNumber, streamToString } from '../../common/util';
+import { PgDumpManager } from '../pgDump/pgDumpManager';
+import { CleanupMode } from '../common/types';
+import { nameFormat } from '../common/helpers';
+import { createDirectory } from '../../common/util';
 
-export const CREATE_MANAGER_FACTORY = Symbol('CreateManagerFactory');
+const buildDumpMetadata = (format: string, metadata: Partial<DumpMetadata>): DumpMetadata => {
+  const now = new Date();
+  const { sequenceNumber, bucket } = metadata;
+  const name = nameFormat(format, sequenceNumber?.toString());
+
+  return {
+    name,
+    bucket,
+    timestamp: now,
+    sequenceNumber: sequenceNumber ?? DEFAULT_STATE, // TODO: fix
+  };
+};
 
 @injectable()
-export class CreateManager {
+export class CreateManager extends PgDumpManager {
   public constructor(
-    @inject(SERVICES.LOGGER) private readonly logger: Logger,
-    private readonly s3Client: S3ClientWrapper,
+    @inject(SERVICES.LOGGER) logger: Logger,
+    @inject(SERVICES.CONFIG) config: IConfig,
     private readonly dumpServerClient: DumpServerClient,
-    private readonly commandRunner: CommandRunner
-  ) {}
-
-  public async createPgDump(dumpTableName: string): Promise<string> {
-    this.logger.info({ msg: 'creating pg dump', dumpTableName });
-
-    const executable: Executable = 'pg_dump';
-    const pgDumpOutputPath = join(PG_DUMPS_PATH, dumpTableName);
-    const args = ['--format=custom', `--file=${pgDumpOutputPath}`];
-
-    await this.commandWrapper(executable, args, PgDumpError);
-
-    return pgDumpOutputPath;
+    private readonly s3Client: S3ClientWrapper
+  ) {
+    super(logger, config, dumpServerClient.axios); // TODO: fix this inheritance
   }
 
-  public async createOsmDump(pgDumpFilePath: string, osmDumpName: string): Promise<string> {
-    this.logger.info({ msg: 'creating ng dump', osmDumpName, pgDumpFilePath });
+  public async createNgDump(
+    stateSource: string,
+    dumpNameFormat: string,
+    cleanupMode: CleanupMode,
+    pgDumpFilePath: string,
+    s3BucketName: string,
+    mediator?: StatefulMediator | undefined
+  ): Promise<string> {
+    await mediator?.reserveAccess();
+
+    const state = await this.getState(stateSource);
+
+    const dumpMetadata = buildDumpMetadata(dumpNameFormat, { bucket: s3BucketName, sequenceNumber: parseInt(state) });
+
+    await mediator?.createAction({ state: parseInt(state), metadata: dumpMetadata });
+    await mediator?.removeLock();
+
+    // TODO: cleanup mode
+    // TODO: create/flush state dir depends on continous arg
+    const currentNgDumpDir = join(WORKDIR, state, NG_DUMP_DIR);
+    await createDirectory(currentNgDumpDir);
+    const ngDumpOutputPath = join(currentNgDumpDir, dumpMetadata.name);
+
+    // execute commmad
+    await this.executeNgDump(pgDumpFilePath, ngDumpOutputPath);
+
+    return ngDumpOutputPath;
+  }
+
+  public async executeNgDump(pgDumpFilePath: string, ngDumpFilePath: string): Promise<void> {
+    this.logger.info({ msg: 'creating ng dump', pgDumpFilePath, ngDumpFilePath });
 
     const executable: Executable = 'planet-dump-ng';
-    const osmDumpOutputPath = join(NG_DUMPS_PATH, osmDumpName);
-    const args = [`--dump-file=${pgDumpFilePath}`, `--pbf=${osmDumpOutputPath}`];
+    const args = [`--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpFilePath}`];
 
     await this.commandWrapper(executable, args, PlanetDumpNgError);
-
-    return osmDumpOutputPath;
   }
 
   public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {
@@ -66,33 +96,5 @@ export class CreateManager {
     });
 
     await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
-  }
-
-  public async getSequenceNumber(bucketName: string): Promise<number> {
-    this.logger.info({ msg: 'getting current sequence sequence number from s3', bucketName });
-
-    const stateStream = await this.s3Client.getObjectWrapper(bucketName, STATE_FILE_NAME);
-    const stateContent = await streamToString(stateStream);
-    return this.fetchSequenceNumberSafely(stateContent);
-  }
-
-  private async commandWrapper(executable: Executable, args: string[], error: new (message?: string) => Error, command?: string): Promise<void> {
-    this.logger.info({ msg: 'executing command', executable, command, args });
-
-    const { exitCode } = await this.commandRunner.run(executable, command, args);
-
-    if (exitCode !== 0) {
-      this.logger.error({ msg: 'failure occurred during the execute of command', executable, command, args, executableExitCode: exitCode });
-      throw new error(`an error occurred while running ${executable} with ${command ?? 'undefined'} command, exit code ${exitCode as number}`);
-    }
-  }
-
-  private fetchSequenceNumberSafely(content: string): number {
-    try {
-      return fetchSequenceNumber(content);
-    } catch (error) {
-      this.logger.error({ err: error, msg: 'failed to fetch sequence number out of the state file' });
-      throw new InvalidStateFileError('could not fetch sequence number out of the state file');
-    }
   }
 }

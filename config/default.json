@@ -25,7 +25,10 @@
   },
   "arstotzka": {
     "enabled": false,
-    "serviceId": "serviceId",
+    "services": {
+      "planetDumperPg": "pgServiceId",
+      "planetDumperNg": "ngServiceId"
+    },
     "mediator": {
       "timeout": 10000,
       "enableRetryStrategy": false,

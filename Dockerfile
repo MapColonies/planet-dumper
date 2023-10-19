@@ -3,7 +3,7 @@ ARG NODE_VERSION=16
 FROM ubuntu:20.04 AS buildPlanetDumpNg
 
 ENV DEBIAN_FRONTEND=noninteractive
-ARG PLANET_DUMP_NG_TAG=v1.2.3
+ARG PLANET_DUMP_NG_TAG=v1.2.7
 WORKDIR /app
 
 RUN apt-get update \
@@ -43,7 +43,7 @@ FROM ubuntu:20.04 as production
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV workdir /app
-ARG POSTGRESQL_VERSION=13
+ARG POSTGRESQL_VERSION=15
 ARG NODE_VERSION
 
 WORKDIR ${workdir}

@@ -9,10 +9,11 @@ import { tracing } from './common/tracing';
 import { InjectionObject, registerDependencies } from './common/dependencyRegistration';
 import { cliBuilderFactory } from './cliBuilderFactory';
 import { createCommandFactory, CREATE_COMMAND_FACTORY } from './commands/create/create';
-import { createManagerFactory } from './commands/create/createManagerFactory';
-import { CREATE_MANAGER_FACTORY } from './commands/create/createManager';
+import { createManagerFactory, CREATE_MANAGER_FACTORY } from './commands/create/createManagerFactory';
 import { ShutdownHandler } from './common/shutdownHandler';
 import { ArstotzkaConfig } from './common/interfaces';
+import { pgDumpCommandFactory, PG_DUMP_COMMAND_FACTORY } from './commands/pgDump/pgDumpFactory';
+import { pgDumpManagerFactory, PG_DUMP_MANAGER_FACTORY } from './commands/pgDump/pgDumpManagerFactory';
 
 export interface RegisterOptions {
   override?: InjectionObject<unknown>[];
@@ -35,7 +36,9 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
 
     const dependencies: InjectionObject<unknown>[] = [
       { token: CLI_BUILDER, provider: { useFactory: cliBuilderFactory } },
+      { token: PG_DUMP_COMMAND_FACTORY, provider: { useFactory: pgDumpCommandFactory } },
       { token: CREATE_COMMAND_FACTORY, provider: { useFactory: createCommandFactory } },
+      { token: PG_DUMP_MANAGER_FACTORY, provider: { useFactory: pgDumpManagerFactory } },
       { token: CREATE_MANAGER_FACTORY, provider: { useFactory: createManagerFactory } },
       { token: SERVICES.CONFIG, provider: { useValue: config } },
       { token: SERVICES.LOGGER, provider: { useValue: logger } },

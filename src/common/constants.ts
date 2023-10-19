@@ -30,12 +30,16 @@ export const ExitCodes = {
   INVALID_STATE_FILE_ERROR: 107,
 };
 
+export const NOT_FOUND_INDEX = -1;
 export const S3_REGION = 'us-east-1';
 export const S3_NOT_FOUND_ERROR_NAME = 'NotFound';
 export const PG_DUMPS_PATH = '/tmp';
 export const NG_DUMPS_PATH = '/tmp';
+export const WORKDIR = '/workdir';
+export const PG_DUMP_DIR = 'pg_dump';
+export const NG_DUMP_DIR = 'ng_dump';
 export const PBF_FILE_FORMAT = 'pbf';
 export const PG_DUMP_FILE_FORMAT = 'dmp';
 export const STATE_FILE_NAME = 'state.txt';
 export const SEQUENCE_NUMBER_REGEX = /sequenceNumber=\d+/;
-export const DEFAULT_SEQUENCE_NUMBER = 1;
+export const DEFAULT_STATE = 1;

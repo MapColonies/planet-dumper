@@ -46,7 +46,10 @@
       "__name": "ARSTOTZKA_ENABLED",
       "__format": "boolean"
     },
-    "serviceId": "ARSTOTZKA_SERVICE_ID",
+    "services": {
+      "__name": "ARSTOTZKA_SERVICE_IDS",
+      "__format": "json"
+    },
     "mediator": {
       "timeout": {
         "__name": "MEDIATOR_TIMEOUT",
