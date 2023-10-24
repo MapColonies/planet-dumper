@@ -34,6 +34,10 @@ export interface PgDumpConfig {
   verbose: boolean;
 }
 
+export interface NgDumpConfig {
+  maxConcurrency: number;
+}
+
 export interface DumpServerConfig {
   dumpServerEndpoint?: string;
   dumpServerHeaders: string[];

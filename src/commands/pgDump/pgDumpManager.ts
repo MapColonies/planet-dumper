@@ -1,26 +1,30 @@
-import { existsSync } from 'fs';
-import { rmdir } from 'fs/promises';
 import { join } from 'path';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
 import { AxiosInstance } from 'axios';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
-import { PG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
+import { EMPTY_STRING, PG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
 import { InvalidStateFileError, PgDumpError } from '../../common/errors';
 import { Executable } from '../../common/types';
-import { clearDirectory, createDirectory, fetchSequenceNumber, streamToString } from '../../common/util';
-import { spawnChild } from '../../processes/spawner';
+import {
+  createDirectoryIfNotAlreadyExists,
+  fetchSequenceNumber,
+  getFileSize,
+  listFilesInDirectory,
+  removeDirectory,
+  streamToString,
+} from '../../common/util';
+import { spawnChild } from '../../common/spawner';
 import { IConfig, ILogger, PgDumpConfig, PostgresConfig } from '../../common/interfaces';
-import { CleanupMode } from '../common/types';
 import { nameFormat } from '../common/helpers';
 
 @injectable()
 export class PgDumpManager {
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  private readonly globalCommandArgs: Record<Executable, string[]> = { pg_dump: [], 'planet-dump-ng': [] };
+  public state = EMPTY_STRING;
 
-  private state: string | undefined;
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  protected readonly globalCommandArgs: Record<Executable, string[]> = { pg_dump: [], 'planet-dump-ng': [] };
 
   public constructor(
     @inject(SERVICES.LOGGER) public readonly logger: Logger,
@@ -30,53 +34,53 @@ export class PgDumpManager {
     this.processConfig(config);
   }
 
-  public async createPgDump(stateSource: string, dumpNameFormat: string, cleanupMode: CleanupMode, mediator?: StatefulMediator): Promise<string> {
+  public async createPgDump(outputFormat: string, shouldResume: boolean, mediator?: StatefulMediator): Promise<string> {
+    const currentPgDumpDir = join(WORKDIR, this.state, PG_DUMP_DIR);
+
+    // resume from existing pg dump if exists
+    if (shouldResume) {
+      const existingPgDumps = await listFilesInDirectory(currentPgDumpDir);
+
+      if (existingPgDumps.length > 0) {
+        const pgDumpFilePath = existingPgDumps[0];
+        this.logger.info({ msg: 'resuming from an existing pg dump', pgDumpFilePath, pgDumpDirList: existingPgDumps });
+        return pgDumpFilePath;
+      }
+    }
+
     await mediator?.reserveAccess();
 
-    // get current state
-    const state = await this.getState(stateSource);
-
-    const pgDumpName = nameFormat(dumpNameFormat, state);
-    const currentPgDumpDir = join(WORKDIR, state, PG_DUMP_DIR);
+    const pgDumpName = nameFormat(outputFormat, this.state);
     const pgDumpOutputPath = join(currentPgDumpDir, pgDumpName);
     const metadata = { pgDumpName, pgDumpOutputPath };
 
-    await mediator?.createAction({ state: parseInt(state), metadata });
+    await mediator?.createAction({ state: parseInt(this.state), metadata });
     await mediator?.removeLock();
 
-    // pre cleanup
-    if (cleanupMode === 'pre-clean-others') {
-      await clearDirectory(WORKDIR, [state]);
-    }
-
     // prepare state environment
-    if (existsSync(currentPgDumpDir)) {
-      await rmdir(currentPgDumpDir, { recursive: true });
-    }
-    await createDirectory(currentPgDumpDir);
+    await removeDirectory(currentPgDumpDir);
+    await createDirectoryIfNotAlreadyExists(currentPgDumpDir);
 
     // execute command
     await this.executePgDump(pgDumpOutputPath);
 
-    // post cleanup
-    if (cleanupMode === 'post-clean-others') {
-      await clearDirectory(WORKDIR, [state]);
-    }
+    // collect metadata
+    const size = await getFileSize(pgDumpOutputPath);
 
-    await mediator?.updateAction({ status: ActionStatus.COMPLETED });
+    await mediator?.updateAction({ status: ActionStatus.COMPLETED, metadata: { size } });
 
     return pgDumpOutputPath;
   }
 
   public async getState(stateSource: string): Promise<string> {
-    if (this.state !== undefined) {
+    if (this.state !== EMPTY_STRING) {
       this.logger.debug({ msg: 'state is already defined on manager', state: this.state });
       return this.state;
     }
 
     if (!isNaN(parseInt(stateSource))) {
-      this.state = stateSource;
-      this.logger.info({ msg: 'state is set to numeric value', state: this.state });
+      this.state = stateSource.toString();
+      this.logger.info({ msg: 'state is set to static value', state: this.state });
       return this.state;
     }
 
@@ -94,20 +98,20 @@ export class PgDumpManager {
   public async commandWrapper(
     executable: Executable,
     commandArgs: string[],
-    error: new (message?: string) => Error,
-    command?: string
+    error: new (message?: string) => Error = Error,
+    command?: string,
+    cwd?: string
   ): Promise<void> {
-    const globalArgs = this.globalCommandArgs[executable];
-    const args = command !== undefined ? [command, ...globalArgs, ...commandArgs] : [...globalArgs, ...commandArgs];
+    const args = command !== undefined ? [command, ...commandArgs] : commandArgs;
 
-    this.logger.info({ msg: 'executing command', executable, command, args });
+    this.logger.info({ msg: 'executing command', executable, command, args, cwd });
 
     let childLogger: ILogger | undefined;
-    if (globalArgs.includes('--verbose')) {
+    if (args.includes('--verbose')) {
       childLogger = this.logger.child({ executable, command, args }, { level: 'debug' });
     }
 
-    const { exitCode, stderr } = await spawnChild(executable, args, command, undefined, childLogger);
+    const { exitCode, stderr } = await spawnChild(executable, args, command, cwd, undefined, childLogger);
 
     if (exitCode !== 0) {
       this.logger.error({ msg: 'failure occurred during the execute of command', executable, command, args, executableExitCode: exitCode, stderr });
@@ -115,28 +119,11 @@ export class PgDumpManager {
     }
   }
 
-  private async executePgDump(pgDumpOutputPath: string): Promise<void> {
-    this.logger.info({ msg: 'creating pg dump', pgDumpOutputPath });
+  protected processConfig(config: IConfig): void {
+    const pgDumpConfig = config.get<PgDumpConfig>('pgDump');
 
-    const executable: Executable = 'pg_dump';
-    const args = ['--format=custom', `--file=${pgDumpOutputPath}`];
-
-    await this.commandWrapper(executable, args, PgDumpError);
-  }
-
-  private fetchSequenceNumberSafely(content: string): string {
-    try {
-      return fetchSequenceNumber(content);
-    } catch (error) {
-      this.logger.error({ err: error, msg: 'failed to fetch sequence number out of the state file' });
-      throw new InvalidStateFileError('could not fetch sequence number out of the state file');
-    }
-  }
-
-  private processConfig(config: IConfig): void {
     const pgDumpGlobalArgs = this.globalCommandArgs.pg_dump;
 
-    const pgDumpConfig = config.get<PgDumpConfig>('pgDump');
     if (pgDumpConfig.verbose) {
       pgDumpGlobalArgs.push('--verbose');
     }
@@ -148,6 +135,25 @@ export class PgDumpManager {
       pgDumpGlobalArgs.push(`sslcert=${cert}`);
       pgDumpGlobalArgs.push(`sslkey=${key}`);
       pgDumpGlobalArgs.push(`sslrootcert=${ca}`);
+    }
+  }
+
+  private async executePgDump(pgDumpOutputPath: string): Promise<void> {
+    this.logger.info({ msg: 'creating pg dump', pgDumpOutputPath });
+
+    const executable: Executable = 'pg_dump';
+    const globalArgs = this.globalCommandArgs[executable];
+    const args = [...globalArgs, '--format=custom', `--file=${pgDumpOutputPath}`];
+
+    await this.commandWrapper(executable, args, PgDumpError);
+  }
+
+  private fetchSequenceNumberSafely(content: string): string {
+    try {
+      return fetchSequenceNumber(content);
+    } catch (error) {
+      this.logger.error({ err: error, msg: 'failed to fetch sequence number out of the state file' });
+      throw new InvalidStateFileError('could not fetch sequence number out of the state file');
     }
   }
 }

@@ -41,6 +41,8 @@ spec:
           imagePullPolicy: {{ .pullPolicy }}
           args:
             - {{ .Values.cli.command }}
+          # command: [ "/bin/bash", "-c", "--" ]
+          # args: [ "while true; do sleep 999999; done;" ]
           envFrom:
             - configMapRef:
                 name: {{ $releaseName }}-{{ $chartName }}-configmap
@@ -63,10 +65,19 @@ spec:
             - name: postgres-cert-conf
               mountPath: {{ .Values.postgres.sslAuth.mountPath }}
           {{- end }}
+          {{- if .Values.pvc.enabled }}
+            - name: planet-dumper-storage
+              mountPath: /workdir
+          {{- end }}
       volumes:
         {{- if .Values.postgres.sslAuth.enabled }}
         - name: postgres-cert-conf
           secret:
             secretName: {{ .Values.postgres.sslAuth.secretName }}
+        {{- end }}
+        {{- if .Values.pvc.enabled }}
+        - name: planet-dumper-storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.name | quote }}
         {{- end }}
 {{- end -}}

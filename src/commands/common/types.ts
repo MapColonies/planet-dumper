@@ -5,5 +5,5 @@ export type ExtendedCleanupMode = CleanupMode | 'post-clean-workdir' | 'post-cle
 export interface GlobalArguments {
   outputFormat: string;
   stateSource: string;
-  cleanupMode: CleanupMode;
+  cleanupMode: CleanupMode | ExtendedCleanupMode;
 }

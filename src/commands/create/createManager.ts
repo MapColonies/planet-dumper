@@ -1,78 +1,74 @@
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
-import { DEFAULT_STATE, NG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
+import { AxiosInstance } from 'axios';
+import { NG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
 import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
 import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpServerConfig, IConfig } from '../../common/interfaces';
+import { DumpMetadata, DumpServerConfig, IConfig, NgDumpConfig } from '../../common/interfaces';
 import { Executable } from '../../common/types';
 import { PgDumpManager } from '../pgDump/pgDumpManager';
-import { CleanupMode } from '../common/types';
 import { nameFormat } from '../common/helpers';
-import { createDirectory } from '../../common/util';
-
-const buildDumpMetadata = (format: string, metadata: Partial<DumpMetadata>): DumpMetadata => {
-  const now = new Date();
-  const { sequenceNumber, bucket } = metadata;
-  const name = nameFormat(format, sequenceNumber?.toString());
-
-  return {
-    name,
-    bucket,
-    timestamp: now,
-    sequenceNumber: sequenceNumber ?? DEFAULT_STATE, // TODO: fix
-  };
-};
+import { emptyDirectory, createDirectoryIfNotAlreadyExists, getFileSize } from '../../common/util';
 
 @injectable()
 export class CreateManager extends PgDumpManager {
   public constructor(
     @inject(SERVICES.LOGGER) logger: Logger,
     @inject(SERVICES.CONFIG) config: IConfig,
-    private readonly dumpServerClient: DumpServerClient,
+    @inject(SERVICES.HTTP_CLIENT) axios: AxiosInstance,
     private readonly s3Client: S3ClientWrapper
   ) {
-    super(logger, config, dumpServerClient.axios); // TODO: fix this inheritance
+    super(logger, config, axios);
   }
 
   public async createNgDump(
-    stateSource: string,
-    dumpNameFormat: string,
-    cleanupMode: CleanupMode,
+    outputFormat: string,
     pgDumpFilePath: string,
-    s3BucketName: string,
+    shouldResume: boolean,
     mediator?: StatefulMediator | undefined
   ): Promise<string> {
     await mediator?.reserveAccess();
 
-    const state = await this.getState(stateSource);
+    const ngDumpName = nameFormat(outputFormat, this.state);
+    const currentNgDumpDir = join(WORKDIR, this.state, NG_DUMP_DIR);
+    const ngDumpOutputPath = join(currentNgDumpDir, ngDumpName);
+    const metadata = { ngDumpName, ngDumpOutputPath };
 
-    const dumpMetadata = buildDumpMetadata(dumpNameFormat, { bucket: s3BucketName, sequenceNumber: parseInt(state) });
-
-    await mediator?.createAction({ state: parseInt(state), metadata: dumpMetadata });
+    await mediator?.createAction({ state: parseInt(this.state), metadata });
     await mediator?.removeLock();
 
-    // TODO: cleanup mode
-    // TODO: create/flush state dir depends on continous arg
-    const currentNgDumpDir = join(WORKDIR, state, NG_DUMP_DIR);
-    await createDirectory(currentNgDumpDir);
-    const ngDumpOutputPath = join(currentNgDumpDir, dumpMetadata.name);
+    await createDirectoryIfNotAlreadyExists(currentNgDumpDir);
+
+    // if should not resume clear already existing mid dump files
+    if (!shouldResume) {
+      await emptyDirectory(currentNgDumpDir);
+    }
 
     // execute commmad
-    await this.executeNgDump(pgDumpFilePath, ngDumpOutputPath);
+    await this.executeNgDump(pgDumpFilePath, ngDumpOutputPath, shouldResume);
+
+    // collect metadata
+    const size = await getFileSize(ngDumpOutputPath);
+    await mediator?.updateAction({ metadata: { size } });
 
     return ngDumpOutputPath;
   }
 
-  public async executeNgDump(pgDumpFilePath: string, ngDumpFilePath: string): Promise<void> {
+  public async executeNgDump(pgDumpFilePath: string, ngDumpFilePath: string, shouldResume?: boolean): Promise<void> {
     this.logger.info({ msg: 'creating ng dump', pgDumpFilePath, ngDumpFilePath });
 
     const executable: Executable = 'planet-dump-ng';
-    const args = [`--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpFilePath}`];
+    const globalArgs = this.globalCommandArgs[executable];
+    const args = [...globalArgs, `--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpFilePath}`];
 
-    await this.commandWrapper(executable, args, PlanetDumpNgError);
+    if (shouldResume === true) {
+      args.push('--resume');
+    }
+
+    await this.commandWrapper(executable, args, PlanetDumpNgError, undefined, dirname(ngDumpFilePath));
   }
 
   public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {
@@ -95,6 +91,19 @@ export class CreateManager extends PgDumpManager {
       dumpMetadata,
     });
 
-    await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
+    const dumpServerClient = new DumpServerClient(this.logger, this.axios);
+    await dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
+  }
+
+  protected override processConfig(config: IConfig): void {
+    super.processConfig(config);
+
+    const ngDumpConfig = config.get<NgDumpConfig>('ngDump');
+
+    const ngDumpGlobalArgs = this.globalCommandArgs['planet-dump-ng'];
+
+    if (ngDumpConfig.maxConcurrency) {
+      ngDumpGlobalArgs.push(`--max-concurrency=${ngDumpConfig.maxConcurrency.toString()}`);
+    }
   }
 }

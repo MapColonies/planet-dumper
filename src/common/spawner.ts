@@ -21,12 +21,14 @@ export const spawnChild = async (
   executable: string,
   commandArgs: string[] = [],
   command?: string,
+  cwd?: string,
   envOptions?: NodeJS.ProcessEnv,
   logger?: ILogger
 ): Promise<ExecaChildProcess> => {
   const spawnedChild = execa(executable, command !== undefined ? [command, ...commandArgs] : commandArgs, {
     env: { ...process.env, ...envOptions },
     encoding: 'utf-8',
+    cwd,
   });
 
   const drain = (): void => {

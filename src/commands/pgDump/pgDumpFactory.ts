@@ -3,13 +3,14 @@ import { Logger } from '@map-colonies/js-logger';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
 import { container, FactoryFunction } from 'tsyringe';
-import { DEFAULT_STATE, ExitCodes, EXIT_CODE, SERVICES } from '../../common/constants';
+import { DEFAULT_STATE, ExitCodes, EXIT_CODE, SERVICES, WORKDIR } from '../../common/constants';
 import { ErrorWithExitCode } from '../../common/errors';
 import { ArstotzkaConfig } from '../../common/interfaces';
 import { check as checkWrapper } from '../../wrappers/check';
 import { CleanupMode, GlobalArguments as PgDumpArguments } from '../common/types';
 import { stateSourceCheck } from '../common/checks';
-import { terminateChildren } from '../../processes/spawner';
+import { terminateChildren } from '../../common/spawner';
+import { emptyDirectory } from '../../common/util';
 import { PgDumpManager } from './pgDumpManager';
 import { PG_DUMP_MANAGER_FACTORY } from './pgDumpManagerFactory';
 
@@ -26,7 +27,7 @@ export const pgDumpCommandFactory: FactoryFunction<CommandModule<PgDumpArguments
     yargs
       .option('outputFormat', {
         alias: ['o', 'output-format'],
-        description: 'The resulting output name format, example: prefix_{sequenceNumber}_{timestamp}_suffix.pbf',
+        description: 'The resulting output name format, example: prefix_{state}_{timestamp}_suffix.pbf',
         nargs: 1,
         type: 'string',
         demandOption: true,
@@ -65,7 +66,19 @@ export const pgDumpCommandFactory: FactoryFunction<CommandModule<PgDumpArguments
     const manager = dependencyContainer.resolve<PgDumpManager>(PG_DUMP_MANAGER_FACTORY);
 
     try {
-      await manager.createPgDump(outputFormat, stateSource, cleanupMode, pgMediator);
+      const state = await manager.getState(stateSource);
+
+      // pre cleanup
+      if (cleanupMode === 'pre-clean-others') {
+        await emptyDirectory(WORKDIR, [state]);
+      }
+
+      await manager.createPgDump(outputFormat, false, pgMediator);
+
+      // post cleanup
+      if (cleanupMode === 'post-clean-others') {
+        await emptyDirectory(WORKDIR, [state]);
+      }
 
       logger.info({ msg: 'finished command execution successfully', command, args });
     } catch (error) {

@@ -9,7 +9,7 @@ export const PG_DUMP_MANAGER_FACTORY = Symbol('PgDumpManagerFactory');
 
 export const pgDumpManagerFactory: FactoryFunction<PgDumpManager> = (dependencyContainer) => {
   const logger = dependencyContainer.resolve<Logger>(SERVICES.LOGGER);
-  const axios = dependencyContainer.resolve<AxiosInstance>(SERVICES.HTTP_CLIENT);
   const config = dependencyContainer.resolve<IConfig>(SERVICES.CONFIG);
+  const axios = dependencyContainer.resolve<AxiosInstance>(SERVICES.HTTP_CLIENT);
   return new PgDumpManager(logger, config, axios);
 };

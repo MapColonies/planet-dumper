@@ -41,13 +41,19 @@
       "__format": "boolean"
     }
   },
+  "ngDump": {
+    "maxConcurrency": {
+      "__name": "NG_DUMP_MAX_CONCURRENCY",
+      "__format": "number"
+    }
+  },
   "arstotzka": {
     "enabled": {
       "__name": "ARSTOTZKA_ENABLED",
       "__format": "boolean"
     },
     "services": {
-      "__name": "ARSTOTZKA_SERVICE_IDS",
+      "__name": "ARSTOTZKA_SERVICES",
       "__format": "json"
     },
     "mediator": {

@@ -1,7 +1,7 @@
 import yargs from 'yargs/yargs';
 import { Argv, CommandModule } from 'yargs';
 import { FactoryFunction } from 'tsyringe';
-import { CREATE_COMMAND_FACTORY } from './commands/create/create';
+import { CREATE_COMMAND_FACTORY } from './commands/create/createFactory';
 import { PG_DUMP_COMMAND_FACTORY } from './commands/pgDump/pgDumpFactory';
 
 export const cliBuilderFactory: FactoryFunction<Argv> = (dependencyContainer) => {

@@ -8,7 +8,7 @@ import { SERVICES, CLI_NAME, CLI_BUILDER, EXIT_CODE, ExitCodes } from './common/
 import { tracing } from './common/tracing';
 import { InjectionObject, registerDependencies } from './common/dependencyRegistration';
 import { cliBuilderFactory } from './cliBuilderFactory';
-import { createCommandFactory, CREATE_COMMAND_FACTORY } from './commands/create/create';
+import { createCommandFactory, CREATE_COMMAND_FACTORY } from './commands/create/createFactory';
 import { createManagerFactory, CREATE_MANAGER_FACTORY } from './commands/create/createManagerFactory';
 import { ShutdownHandler } from './common/shutdownHandler';
 import { ArstotzkaConfig } from './common/interfaces';

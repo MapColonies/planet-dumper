@@ -1,7 +1,7 @@
 import { isWebUri } from 'valid-url';
 import { CheckError } from '../../../common/errors';
 import { CheckFunc } from '../../../wrappers/check';
-import { CreateArguments } from '../create';
+import { CreateArguments } from '../createFactory';
 
 const DUMP_SERVER_URI_CHECK_ARG = 'dump-server-endpoint';
 const HTTP_HEADERS_CHECK_ARG = 'dump-server-headers';

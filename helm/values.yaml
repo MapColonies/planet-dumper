@@ -17,8 +17,8 @@ cloudProvider:
 image:
   repository: planet-dumper
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 'v5.1.0-rc1'
-  pullPolicy: Always
+  # tag: 'latest'
+  pullPolicy: IfNotPresent
 
 job:
   apiVersion: 'batch/v1' # depends on openshift version batch/v1 or batch/v1beta1
@@ -47,6 +47,8 @@ env:
     timeout: 1000
   pgDump:
     verbose: false
+  ngDump:
+    maxConcurrency: 16
 
 postgres:
   host: localhost
@@ -68,13 +70,17 @@ s3:
   bucketName: planet-dumps
   acl: private
 
+pvc:
+  enabled: true
+  name: pvc-name
+
 cli:
   command: 'create'
+  outputFormat: dump_{state}_{timestamp}.pbf
+  stateSource: https://osm-diffs.com/state.txt
+  cleanupMode: 'none'
   create:
-    dumpNameFormat: dump_{sequenceNumber}_{timestamp}.pbf
-    stateDetermination:
-      enabled: true
-      bucketName: osmdbt
+    resume: false
     dumpServer:
       enabled: true
       endpoint: http://dump-server.com

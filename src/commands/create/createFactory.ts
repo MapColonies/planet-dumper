@@ -1,3 +1,4 @@
+import { join } from 'path';
 import fsPromises from 'fs/promises';
 import { Argv, CommandModule, Arguments } from 'yargs';
 import { Logger } from '@map-colonies/js-logger';
@@ -5,22 +6,25 @@ import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
 import { container, FactoryFunction } from 'tsyringe';
 import { S3Client } from '@aws-sdk/client-s3';
-import { ExitCodes, EXIT_CODE, S3_REGION, SERVICES } from '../../common/constants';
+import { ExitCodes, EXIT_CODE, S3_REGION, SERVICES, WORKDIR } from '../../common/constants';
 import { ErrorWithExitCode } from '../../common/errors';
 import { check as checkWrapper } from '../../wrappers/check';
-import { GlobalArguments } from '../common/types';
-import { ArstotzkaConfig, DumpMetadata, DumpServerConfig, S3Config } from '../../common/interfaces';
+import { ExtendedCleanupMode, GlobalArguments } from '../common/types';
+import { ArstotzkaConfig, DumpServerConfig, S3Config } from '../../common/interfaces';
 import { stateSourceCheck } from '../common/checks';
-import { terminateChildren } from '../../processes/spawner';
+import { terminateChildren } from '../../common/spawner';
+import { emptyDirectory } from '../../common/util';
+import { buildDumpMetadata } from '../common/helpers';
 import { CreateManager } from './createManager';
 import { httpHeadersCheck, dumpServerUriCheck } from './checks';
 import { CREATE_MANAGER_FACTORY } from './createManagerFactory';
 
 export const CREATE_COMMAND_FACTORY = Symbol('CreateCommandFactory');
 
-export type CreateArguments = GlobalArguments & S3Config & DumpServerConfig;
+export interface CreateArguments extends GlobalArguments, S3Config, DumpServerConfig {
+  resume: boolean;
+}
 
-// TODO: rename file name to createFactory
 export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments, CreateArguments>> = (dependencyContainer) => {
   const command = 'create';
 
@@ -57,6 +61,20 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
         type: 'string',
         default: [] as string[],
       })
+      .option('cleanupMode', {
+        alias: 'c',
+        describe: 'the command execution cleanup mode',
+        choices: ['none', 'pre-clean-others', 'post-clean-others', 'post-clean-workdir', 'post-clean-all'] as ExtendedCleanupMode[],
+        nargs: 1,
+        type: 'string',
+        default: 'none' as ExtendedCleanupMode,
+      })
+      .option('resume', {
+        alias: ['r', 'resume'],
+        describe: 'resume already existing dump state',
+        type: 'boolean',
+        default: false,
+      })
       .check(checkWrapper(stateSourceCheck, logger))
       .check(checkWrapper(dumpServerUriCheck, logger))
       .check(checkWrapper(httpHeadersCheck, logger))
@@ -73,7 +91,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
   };
 
   const handler = async (args: Arguments<CreateArguments>): Promise<void> => {
-    const { stateSource, outputFormat, cleanupMode, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerHeaders } = args;
+    const { stateSource, outputFormat, cleanupMode, resume: shouldResume, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerHeaders } = args;
 
     logger.debug({ msg: 'starting command execution', command, args });
 
@@ -82,25 +100,49 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
 
     const arstotzkaConfig = dependencyContainer.resolve<ArstotzkaConfig>(SERVICES.ARSTOTZKA);
     if (arstotzkaConfig.enabled) {
-      pgMediator = new StatefulMediator({ ...arstotzkaConfig.mediator, serviceId: arstotzkaConfig.services['planetDumpPg'], logger });
-      ngMediator = new StatefulMediator({ ...arstotzkaConfig.mediator, serviceId: arstotzkaConfig.services['planetDumpNg'], logger });
+      pgMediator = new StatefulMediator({ ...arstotzkaConfig.mediator, serviceId: arstotzkaConfig.services['planetDumperPg'], logger });
+      ngMediator = new StatefulMediator({ ...arstotzkaConfig.mediator, serviceId: arstotzkaConfig.services['planetDumperNg'], logger });
     }
 
     const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
 
     try {
-      // TODO: skip if existing and continues
-      const pgDumpFilePath = await manager.createPgDump(stateSource, outputFormat, cleanupMode, pgMediator);
-      const ngDumpFilePath = await manager.createNgDump(stateSource, outputFormat, cleanupMode, pgDumpFilePath, s3BucketName, ngMediator);
+      // get state
+      const state = await manager.getState(stateSource);
 
-      const ngDumpBuffer = await fsPromises.readFile(ngDumpFilePath);
-      await manager.uploadBufferToS3(ngDumpBuffer, s3BucketName, 'dumpMetadata.name', s3Acl); // TODO: fix
-
-      if (dumpServerEndpoint !== undefined) {
-        await manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerHeaders }, 'dumpMetadata' as unknown as DumpMetadata); // TODO: fix
+      // pre cleanup
+      if (cleanupMode === 'pre-clean-others') {
+        await emptyDirectory(WORKDIR, [state]);
       }
 
-      await pgMediator?.updateAction({ status: ActionStatus.COMPLETED });
+      // resume from existing pg dump or create new one
+      const pgDumpFilePath = await manager.createPgDump(outputFormat, shouldResume, pgMediator);
+
+      // create ng dump
+      const ngDumpFilePath = await manager.createNgDump(outputFormat, pgDumpFilePath, shouldResume, ngMediator);
+
+      // build metadata
+      const metadata = buildDumpMetadata(outputFormat, state);
+
+      // s3 upload
+      const ngDumpBuffer = await fsPromises.readFile(ngDumpFilePath);
+      await manager.uploadBufferToS3(ngDumpBuffer, s3BucketName, metadata.name, s3Acl);
+
+      // dump server upload
+      if (dumpServerEndpoint !== undefined) {
+        await manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerHeaders }, { ...metadata, bucket: s3BucketName });
+      }
+
+      // post cleanup
+      if (cleanupMode === 'post-clean-workdir') {
+        await emptyDirectory(join(WORKDIR, state));
+      } else if (cleanupMode === 'post-clean-others') {
+        await emptyDirectory(WORKDIR, [state]);
+      } else if (cleanupMode === 'post-clean-all') {
+        await emptyDirectory(WORKDIR);
+      }
+
+      await ngMediator?.updateAction({ status: ActionStatus.COMPLETED, metadata: { dumpServerPayload: { ...metadata, bucket: s3BucketName } } });
 
       logger.info({ msg: 'finished command execution successfully', command, args });
     } catch (error) {
@@ -111,7 +153,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
       }
 
       terminateChildren();
-      await pgMediator?.updateAction({ status: ActionStatus.FAILED, metadata: { error } });
+      await ngMediator?.updateAction({ status: ActionStatus.FAILED, metadata: { error } });
 
       container.register(EXIT_CODE, { useValue: exitCode });
       logger.error({ err: error, msg: 'an error occurred while executing command', command: command, exitCode });
