@@ -100,14 +100,15 @@ export class PgDumpManager {
     commandArgs: string[],
     error: new (message?: string) => Error = Error,
     command?: string,
-    cwd?: string
+    cwd?: string,
+    verbose?: boolean
   ): Promise<void> {
     const args = command !== undefined ? [command, ...commandArgs] : commandArgs;
 
     this.logger.info({ msg: 'executing command', executable, command, args, cwd });
 
     let childLogger: ILogger | undefined;
-    if (args.includes('--verbose')) {
+    if (verbose === true) {
       childLogger = this.logger.child({ executable, command, args }, { level: 'debug' });
     }
 
@@ -144,8 +145,9 @@ export class PgDumpManager {
     const executable: Executable = 'pg_dump';
     const globalArgs = this.globalCommandArgs[executable];
     const args = [...globalArgs, '--format=custom', `--file=${pgDumpOutputPath}`];
+    const isVerbose = this.config.get<boolean>('pgDump.verbose');
 
-    await this.commandWrapper(executable, args, PgDumpError);
+    await this.commandWrapper(executable, args, PgDumpError, undefined, undefined, isVerbose);
   }
 
   private fetchSequenceNumberSafely(content: string): string {

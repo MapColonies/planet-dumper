@@ -25,5 +25,6 @@ data:
   {{- end }}
   HTTP_CLIENT_TIMEOUT: {{ .Values.env.httpClient.timeout | quote }}
   PG_DUMP_VERBOSE: {{ .Values.env.pgDump.verbose | quote }}
+  NG_DUMP_VERBOSE: {{ .Values.env.ngDump.verbose | quote }}
   NG_DUMP_MAX_CONCURRENCY: {{ .Values.env.ngDump.maxConcurrency | quote }}
 {{- end -}}

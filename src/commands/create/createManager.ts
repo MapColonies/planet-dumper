@@ -63,12 +63,13 @@ export class CreateManager extends PgDumpManager {
     const executable: Executable = 'planet-dump-ng';
     const globalArgs = this.globalCommandArgs[executable];
     const args = [...globalArgs, `--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpFilePath}`];
+    const isVerbose = this.config.get<boolean>('ngDump.verbose');
 
     if (shouldResume === true) {
       args.push('--resume');
     }
 
-    await this.commandWrapper(executable, args, PlanetDumpNgError, undefined, dirname(ngDumpFilePath));
+    await this.commandWrapper(executable, args, PlanetDumpNgError, undefined, dirname(ngDumpFilePath), isVerbose);
   }
 
   public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {

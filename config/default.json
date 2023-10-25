@@ -23,6 +23,9 @@
   "pgDump": {
     "verbose": false
   },
+  "ngDump": {
+    "verbose": false
+  },
   "arstotzka": {
     "enabled": false,
     "services": {

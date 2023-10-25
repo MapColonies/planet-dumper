@@ -9,6 +9,7 @@ environment: development
 
 jobAnnotations: {}
 podAnnotations: {}
+cronAnnotations: {}
 
 cloudProvider:
   flavor: openshift
@@ -21,10 +22,21 @@ image:
   pullPolicy: IfNotPresent
 
 job:
+  enabled: true
   apiVersion: 'batch/v1' # depends on openshift version batch/v1 or batch/v1beta1
   restartPolicy: OnFailure
   ttlSecondsAfterFinished: 60
   backoffLimit: 6
+
+cron:
+  enabled: false
+  apiVersion: 'batch/v1' # depends on openshift version batch/v1 or batch/v1beta1
+  restartPolicy: OnFailure
+  schedule: '* * * * *'
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 200
 
 resources:
   enabled: false
@@ -48,6 +60,7 @@ env:
   pgDump:
     verbose: false
   ngDump:
+    verbose: false
     maxConcurrency: 16
 
 postgres:

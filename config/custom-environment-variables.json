@@ -42,6 +42,10 @@
     }
   },
   "ngDump": {
+    "verbose": {
+      "__name": "NG_DUMP_VERBOSE",
+      "__format": "boolean"
+    },
     "maxConcurrency": {
       "__name": "NG_DUMP_MAX_CONCURRENCY",
       "__format": "number"

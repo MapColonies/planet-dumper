@@ -3,7 +3,10 @@
 {{- $cloudProviderFlavor := include "planet-dumper.cloudProviderFlavor" . -}}
 {{- $cloudProviderDockerRegistryUrl := include "planet-dumper.cloudProviderDockerRegistryUrl" . -}}
 {{- $tag := include "planet-dumper.tag" . -}}
-{{- if .Values.enabled -}}
+{{- if and (.Values.enabled) (.Values.job.enabled) -}}
+{{- if .Values.cron.enabled -}}
+{{ fail "only one of 'job'/'cron' can be enabled at the same time" }}
+{{- end -}}
 apiVersion: {{ .Values.job.apiVersion | quote }}
 kind: Job
 metadata:
