@@ -115,7 +115,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
         await emptyDirectory(WORKDIR, [state]);
       }
 
-      // resume from existing pg dump or create new one
+      // create pg dump or resume from existing one
       const pgDumpFilePath = await manager.createPgDump(outputFormat, shouldResume, pgMediator);
 
       // create ng dump

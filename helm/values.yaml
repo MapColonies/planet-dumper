@@ -77,7 +77,7 @@ pvc:
 cli:
   command: 'create'
   outputFormat: dump_{state}_{timestamp}.pbf
-  stateSource: https://osm-diffs.com/state.txt
+  stateSource: https://osm-diffs.com/state.txt # replication url or specific state number
   cleanupMode: 'none'
   create:
     resume: false

@@ -41,8 +41,6 @@ spec:
           imagePullPolicy: {{ .pullPolicy }}
           args:
             - {{ .Values.cli.command }}
-          # command: [ "/bin/bash", "-c", "--" ]
-          # args: [ "while true; do sleep 999999; done;" ]
           envFrom:
             - configMapRef:
                 name: {{ $releaseName }}-{{ $chartName }}-configmap

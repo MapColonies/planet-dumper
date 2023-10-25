@@ -39,6 +39,7 @@
     "@aws-sdk/client-s3": "^3.39.0",
     "@map-colonies/arstotzka-common": "^1.0.0",
     "@map-colonies/arstotzka-mediator": "^1.0.0",
+    "@map-colonies/cleanup-registry": "^1.1.0",
     "@map-colonies/js-logger": "^0.0.5",
     "@map-colonies/read-pkg": "0.0.1",
     "@map-colonies/telemetry": "4.1.0",

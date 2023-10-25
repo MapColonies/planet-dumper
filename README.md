@@ -7,6 +7,27 @@ This is accomplished by using the [planet-dump-ng](https://github.com/zerebubuth
 
 ## Usage
 
+### pg_dump
+```
+index.js pg_dump
+
+create a postgres dump from an existing osm database
+
+Options:
+      --version                        Show version number             [boolean]
+  -h, --help                           Show help                       [boolean]
+  -o, --outputFormat, --output-format  The resulting output name format,
+                                       example:
+                                       prefix_{state}_{timestamp}_suffix.pbf
+                                                             [string] [required]
+  -s, --stateSource                    Determines state seqeunce number to
+                                       source            [string] [default: "1"]
+  -c, --cleanupMode                    the command execution cleanup mode
+   [string] [choices: "none", "pre-clean-others", "post-clean-others"] [default:
+                                                                         "none"]
+```
+
+### create
 ```
 index.js create
 
@@ -16,26 +37,20 @@ Options:
       --version                             Show version number        [boolean]
   -h, --help                                Show help                  [boolean]
   -e, --s3Endpoint, --s3-endpoint           The s3 endpoint  [string] [required]
-  -b, --s3BucketName, --s3-bucket-name      The bucket name containing the state
-                                            and the lua script
-                                                             [string] [required]
+  -b, --s3BucketName, --s3-bucket-name      The bucket the resulting dump will
+                                            be uploaded to   [string] [required]
   -a, --s3Acl, --s3-acl                     The canned acl policy for uploaded
                                             objects
   [choices: "authenticated-read", "private", "public-read", "public-read-write"]
                                                             [default: "private"]
   -s, --dumpServerEndpoint,                 The endpoint of the dump-server
   --dump-server-endpoint                                                [string]
-      --dumpServerHeaders, --dsh,           The headers to attach to the
-      --dump-server-headers                 dump-server request
+  -H, --dumpServerHeaders,                  The headers to attach to the
+  --dump-server-headers                     dump-server request
                                                            [array] [default: []]
-  -n, --dumpNameFormat, --dump-name-format  The resulting dump name format,
-                                            example:
-                                            prefix_{timestamp}_suffix.pbf
-                                                             [string] [required]
-      --stateBucketName, --sbn,             Determines state seqeunce number
-      --state-bucket-name                   according to this bucket state file,
-                                            locks the bucket until creation
-                                            completes                   [string]
+  -c, --cleanupMode                         the command execution cleanup mode
+             [string] [choices: "none", "pre-clean-others", "post-clean-others",
+                       "post-clean-workdir", "post-clean-all"] [default: "none"]
 ```
 
 ## Cli Environment Variables
@@ -59,6 +74,7 @@ Required environment variables:
 Optional environment variables:
 
 - `PG_DUMP_VERBOSE` - verbose flag for pg_dump defaults to false
+- `NG_DUMP_MAX_CONCURRENCY` - maximum number of disk writing threads to run for *each* table
 - `HTTP_CLIENT_TIMEOUT` - http client timeout duration in ms, defaults to 1000ms
 
 Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
