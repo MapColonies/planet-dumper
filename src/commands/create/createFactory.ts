@@ -49,7 +49,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
         default: 'private',
       })
       .option('dumpServerEndpoint', {
-        alias: ['s', 'dump-server-endpoint'],
+        alias: ['d', 'dump-server-endpoint'],
         description: 'The endpoint of the dump-server',
         nargs: 1,
         type: 'string',
