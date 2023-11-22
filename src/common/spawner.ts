@@ -1,3 +1,4 @@
+import { createWriteStream } from 'fs';
 import * as readline from 'readline';
 import { PassThrough } from 'stream';
 import execa, { ExecaChildProcess } from 'execa';
@@ -19,13 +20,13 @@ export interface TerminationResult {
 
 export const spawnChild = async (
   executable: string,
-  commandArgs: string[] = [],
+  args: string[] = [],
   command?: string,
   cwd?: string,
   envOptions?: NodeJS.ProcessEnv,
   logger?: ILogger
 ): Promise<ExecaChildProcess> => {
-  const spawnedChild = execa(executable, command !== undefined ? [command, ...commandArgs] : commandArgs, {
+  const spawnedChild = execa(executable, command !== undefined ? [command, ...args] : args, {
     env: { ...process.env, ...envOptions },
     encoding: 'utf-8',
     cwd,

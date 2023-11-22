@@ -39,6 +39,11 @@ export interface NgDumpConfig {
   maxConcurrency: number;
 }
 
+export interface OsmiumConfig {
+  verbose: boolean;
+  progress: boolean;
+}
+
 export interface DumpServerConfig {
   dumpServerEndpoint?: string;
   dumpServerHeaders: string[];

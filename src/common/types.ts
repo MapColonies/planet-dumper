@@ -1,1 +1,1 @@
-export type Executable = 'pg_dump' | 'planet-dump-ng';
+export type Executable = 'pg_dump' | 'planet-dump-ng' | 'osmium';

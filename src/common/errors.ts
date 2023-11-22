@@ -29,6 +29,13 @@ export class PlanetDumpNgError extends ErrorWithExitCode {
   }
 }
 
+export class OsmiumError extends ErrorWithExitCode {
+  public constructor(message?: string) {
+    super(message, ExitCodes.OSMIUM_ERROR);
+    Object.setPrototypeOf(this, OsmiumError.prototype);
+  }
+}
+
 export class S3Error extends ErrorWithExitCode {
   public constructor(message?: string) {
     super(message, ExitCodes.S3_ERROR);

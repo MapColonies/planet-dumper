@@ -6,8 +6,8 @@ import { AxiosInstance } from 'axios';
 import { NG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
 import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
-import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpServerConfig, IConfig, NgDumpConfig } from '../../common/interfaces';
+import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, OsmiumError, PlanetDumpNgError } from '../../common/errors';
+import { DumpMetadata, DumpServerConfig, IConfig, NgDumpConfig, OsmiumConfig } from '../../common/interfaces';
 import { Executable } from '../../common/types';
 import { PgDumpManager } from '../pgDump/pgDumpManager';
 import { nameFormat } from '../common/helpers';
@@ -28,6 +28,7 @@ export class CreateManager extends PgDumpManager {
     outputFormat: string,
     pgDumpFilePath: string,
     shouldResume: boolean,
+    shouldCollectInfo: boolean,
     mediator?: StatefulMediator | undefined
   ): Promise<string> {
     await mediator?.reserveAccess();
@@ -35,7 +36,7 @@ export class CreateManager extends PgDumpManager {
     const ngDumpName = nameFormat(outputFormat, this.state);
     const currentNgDumpDir = join(WORKDIR, this.state, NG_DUMP_DIR);
     const ngDumpOutputPath = join(currentNgDumpDir, ngDumpName);
-    const metadata = { ngDumpName, ngDumpOutputPath };
+    const metadata: Record<string, unknown> = { ngDumpName, ngDumpOutputPath };
 
     await mediator?.createAction({ state: parseInt(this.state), metadata });
     await mediator?.removeLock();
@@ -51,8 +52,14 @@ export class CreateManager extends PgDumpManager {
     await this.executeNgDump(pgDumpFilePath, ngDumpOutputPath, shouldResume);
 
     // collect metadata
-    const size = await getFileSize(ngDumpOutputPath);
-    await mediator?.updateAction({ metadata: { size } });
+    metadata.size = await getFileSize(ngDumpOutputPath);
+
+    if (shouldCollectInfo) {
+      const collectedInfo = await this.executeOsmium(ngDumpOutputPath);
+      metadata.info = JSON.parse(collectedInfo) as Record<string, unknown>;
+    }
+
+    await mediator?.updateAction({ metadata });
 
     return ngDumpOutputPath;
   }
@@ -70,6 +77,17 @@ export class CreateManager extends PgDumpManager {
     }
 
     await this.commandWrapper(executable, args, PlanetDumpNgError, undefined, dirname(ngDumpFilePath), isVerbose);
+  }
+
+  public async executeOsmium(ngDumpFilePath: string): Promise<string> {
+    this.logger.info({ msg: 'collecting ng dump file info', ngDumpFilePath });
+
+    const executable: Executable = 'osmium';
+    const globalArgs = this.globalCommandArgs[executable];
+    const args = [...globalArgs, '--input-format', 'pbf', '--extended', '--json', ngDumpFilePath];
+    const isVerbose = this.config.get<boolean>('osmium.verbose');
+
+    return this.commandWrapper(executable, args, OsmiumError, 'fileinfo', undefined, isVerbose);
   }
 
   public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {
@@ -106,5 +124,13 @@ export class CreateManager extends PgDumpManager {
     if (ngDumpConfig.maxConcurrency) {
       ngDumpGlobalArgs.push(`--max-concurrency=${ngDumpConfig.maxConcurrency.toString()}`);
     }
+
+    const osmiumConfig = config.get<OsmiumConfig>('osmium');
+    const osmiumArgs = this.globalCommandArgs.osmium;
+
+    if (osmiumConfig.verbose) {
+      osmiumArgs.push('--verbose');
+    }
+    osmiumArgs.push(`${osmiumConfig.progress ? '--progress' : '--no-progress'}`);
   }
 }

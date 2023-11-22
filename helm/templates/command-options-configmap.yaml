@@ -11,6 +11,7 @@ data:
   CLEANUP_MODE: {{ .Values.cli.cleanupMode | quote }}
   {{- if eq .Values.cli.command "create" }}
   RESUME: {{ .Values.cli.create.resume | quote }}
+  INFO: {{ .Values.cli.create.info | quote }}
   {{- end }}
   {{- if eq .Values.cli.command "create" }}
   {{- with .Values.s3 }}

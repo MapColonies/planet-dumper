@@ -62,6 +62,9 @@ env:
   ngDump:
     verbose: false
     maxConcurrency: 16
+  osmium:
+    verbose: false
+    progress: false
 
 postgres:
   host: localhost
@@ -94,6 +97,7 @@ cli:
   cleanupMode: 'none'
   create:
     resume: false
+    info: false
     dumpServer:
       enabled: true
       endpoint: http://dump-server.com

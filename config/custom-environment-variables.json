@@ -51,6 +51,16 @@
       "__format": "number"
     }
   },
+  "osmium": {
+    "verbose": {
+      "__name": "OSMIUM_VERBOSE",
+      "__format": "boolean"
+    },
+    "progress": {
+      "__name": "OSMIUM_PROGRESS",
+      "__format": "boolean"
+    }
+  },
   "arstotzka": {
     "enabled": {
       "__name": "ARSTOTZKA_ENABLED",

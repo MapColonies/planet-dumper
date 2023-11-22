@@ -26,6 +26,10 @@
   "ngDump": {
     "verbose": false
   },
+  "osmium": {
+    "verbose": false,
+    "progress": false
+  },
   "arstotzka": {
     "enabled": false,
     "services": {

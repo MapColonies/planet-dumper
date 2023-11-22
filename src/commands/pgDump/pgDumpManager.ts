@@ -24,7 +24,7 @@ export class PgDumpManager {
   public state = EMPTY_STRING;
 
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  protected readonly globalCommandArgs: Record<Executable, string[]> = { pg_dump: [], 'planet-dump-ng': [] };
+  protected readonly globalCommandArgs: Record<Executable, string[]> = { pg_dump: [], 'planet-dump-ng': [], osmium: [] };
 
   public constructor(
     @inject(SERVICES.LOGGER) public readonly logger: Logger,
@@ -97,14 +97,12 @@ export class PgDumpManager {
 
   public async commandWrapper(
     executable: Executable,
-    commandArgs: string[],
+    args: string[],
     error: new (message?: string) => Error = Error,
     command?: string,
     cwd?: string,
     verbose?: boolean
-  ): Promise<void> {
-    const args = command !== undefined ? [command, ...commandArgs] : commandArgs;
-
+  ): Promise<string> {
     this.logger.info({ msg: 'executing command', executable, command, args, cwd });
 
     let childLogger: ILogger | undefined;
@@ -112,12 +110,14 @@ export class PgDumpManager {
       childLogger = this.logger.child({ executable, command, args }, { level: 'debug' });
     }
 
-    const { exitCode, stderr } = await spawnChild(executable, args, command, cwd, undefined, childLogger);
+    const { exitCode, stderr, stdout } = await spawnChild(executable, args, command, cwd, undefined, childLogger);
 
     if (exitCode !== 0) {
       this.logger.error({ msg: 'failure occurred during the execute of command', executable, command, args, executableExitCode: exitCode, stderr });
       throw new error(`an error occurred while running ${executable} with ${command ?? 'undefined'} command, exit code ${exitCode}`);
     }
+
+    return stdout;
   }
 
   protected processConfig(config: IConfig): void {

@@ -29,6 +29,37 @@ RUN git clone -b ${PLANET_DUMP_NG_TAG} --single-branch https://github.com/zerebu
   && ./configure \
   && make
 
+FROM ubuntu:20.04 AS buildOsmium
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG OSMIUM_TOOL_TAG=v1.16.0
+ARG PROTOZERO_TAG=v1.7.1
+ARG LIBOSMIUM_TAG=v2.20.0
+
+RUN apt-get -y update && apt -y install \
+  make \
+  cmake \
+  g++ \
+  libboost-dev \
+  libboost-system-dev \
+  libboost-filesystem-dev \
+  libboost-program-options-dev \
+  libexpat1-dev \
+  libbz2-dev \
+  libpq-dev \
+  libopencv-dev \
+  zlib1g-dev \
+  git-core
+
+RUN git clone -b ${OSMIUM_TOOL_TAG} --single-branch https://github.com/osmcode/osmium-tool ./osmium-tool && \
+  git clone -b ${PROTOZERO_TAG} --single-branch https://github.com/mapbox/protozero ./protozero && \
+  git clone -b ${LIBOSMIUM_TAG} --single-branch https://github.com/osmcode/libosmium ./libosmium && \
+  cd osmium-tool && \
+  mkdir build && \
+  cd build && \
+  cmake .. && \
+  make
+
 FROM node:${NODE_VERSION} as buildApp
 
 WORKDIR /tmp/buildApp
@@ -49,6 +80,8 @@ ARG NODE_VERSION
 WORKDIR ${workdir}
 
 COPY --from=buildPlanetDumpNg /app/planet-dump-ng/planet-dump-ng /usr/local/bin
+COPY --from=buildOsmium /osmium-tool/build /osmium-tool/build
+RUN ln -s /osmium-tool/build/osmium /bin/osmium
 
 RUN apt-get update \
     && apt-get install -y gnupg \

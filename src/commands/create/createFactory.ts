@@ -23,6 +23,7 @@ export const CREATE_COMMAND_FACTORY = Symbol('CreateCommandFactory');
 
 export interface CreateArguments extends GlobalArguments, S3Config, DumpServerConfig {
   resume: boolean;
+  info: boolean;
 }
 
 export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments, CreateArguments>> = (dependencyContainer) => {
@@ -75,6 +76,12 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
         type: 'boolean',
         default: false,
       })
+      .option('info', {
+        alias: ['i', 'info'],
+        describe: 'collect info on the resulted dump',
+        type: 'boolean',
+        default: false,
+      })
       .check(checkWrapper(stateSourceCheck, logger))
       .check(checkWrapper(dumpServerUriCheck, logger))
       .check(checkWrapper(httpHeadersCheck, logger))
@@ -91,7 +98,17 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
   };
 
   const handler = async (args: Arguments<CreateArguments>): Promise<void> => {
-    const { stateSource, outputFormat, cleanupMode, resume: shouldResume, s3BucketName, s3Acl, dumpServerEndpoint, dumpServerHeaders } = args;
+    const {
+      stateSource,
+      outputFormat,
+      cleanupMode,
+      resume: shouldResume,
+      info: shouldCollectInfo,
+      s3BucketName,
+      s3Acl,
+      dumpServerEndpoint,
+      dumpServerHeaders,
+    } = args;
 
     logger.debug({ msg: 'starting command execution', command, args });
 
@@ -119,7 +136,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
       const pgDumpFilePath = await manager.createPgDump(outputFormat, shouldResume, pgMediator);
 
       // create ng dump
-      const ngDumpFilePath = await manager.createNgDump(outputFormat, pgDumpFilePath, shouldResume, ngMediator);
+      const ngDumpFilePath = await manager.createNgDump(outputFormat, pgDumpFilePath, shouldResume, shouldCollectInfo, ngMediator);
 
       // build metadata
       const metadata = buildDumpMetadata(outputFormat, state);
