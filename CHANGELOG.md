@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.0.0](https://github.com/MapColonies/planet-dumper/compare/v5.1.1...v6.0.0) (2023-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* major improvements (#34)
+
+### Features
+
+* major improvements ([#34](https://github.com/MapColonies/planet-dumper/issues/34)) ([4a0b5c4](https://github.com/MapColonies/planet-dumper/commit/4a0b5c48cc73df387402b135532fdf3fa936938c))
+
 ### [5.1.1](https://github.com/MapColonies/planet-dumper/compare/v5.1.0...v5.1.1) (2023-06-12)
 
 ## [5.1.0](https://github.com/MapColonies/planet-dumper/compare/v5.0.0...v5.1.0) (2023-06-08)
