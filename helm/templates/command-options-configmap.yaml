@@ -6,20 +6,25 @@ kind: ConfigMap
 metadata:
   name: {{ $releaseName }}-{{ $chartName }}-command-options-configmap
 data:
+  OUTPUT_FORMAT: {{ .Values.cli.outputFormat | quote }}
+  STATE_SOURCE: {{ .Values.cli.stateSource | quote }}
+  CLEANUP_MODE: {{ .Values.cli.cleanupMode | quote }}
+  {{- if eq .Values.cli.command "create" }}
+  RESUME: {{ .Values.cli.create.resume | quote }}
+  INFO: {{ .Values.cli.create.info | quote }}
+  {{- end }}
+  {{- if eq .Values.cli.command "create" }}
   {{- with .Values.s3 }}
   S3_ENDPOINT: {{ printf "%s://%s:%v/" .protocol .host .port | quote }}
   S3_BUCKET_NAME: {{ .bucketName | quote }}
   S3_ACL: {{ .acl | default "private" | quote }}
   {{- end }}
   {{- with .Values.cli.create }}
-  DUMP_NAME_FORMAT: {{ .dumpNameFormat | quote }}
-  {{- if .stateDetermination.enabled }}
-  STATE_BUCKET_NAME: {{ .stateDetermination.bucketName | quote }}
-  {{- end }}
   {{- if .dumpServer.enabled }}
   DUMP_SERVER_ENDPOINT: {{ .dumpServer.endpoint | quote }}
   {{- if .dumpServer.attachHeaders }}
   DUMP_SERVER_HEADERS: {{ .dumpServer.headers | quote }}
+  {{- end }}
   {{- end }}
   {{- end }}
   {{- end }}

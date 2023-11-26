@@ -9,7 +9,7 @@ data:
   {{- with .Values.arstotzka }}
   ARSTOTZKA_ENABLED: {{ .enabled | quote }}
   {{- if .enabled }}
-  ARSTOTZKA_SERVICE_ID: {{ .serviceId | quote }}
+  ARSTOTZKA_SERVICES: {{ .services | quote }}
   MEDIATOR_TIMEOUT: {{ .mediator.timeout | quote }}
   MEDIATOR_ENABLE_RETRY_STRATEGY: {{ .mediator.retryStrategy.enabled | quote }}
   {{- if .mediator.retryStrategy.enabled }}

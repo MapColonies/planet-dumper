@@ -3,7 +3,10 @@
 {{- $cloudProviderFlavor := include "planet-dumper.cloudProviderFlavor" . -}}
 {{- $cloudProviderDockerRegistryUrl := include "planet-dumper.cloudProviderDockerRegistryUrl" . -}}
 {{- $tag := include "planet-dumper.tag" . -}}
-{{- if .Values.enabled -}}
+{{- if and (.Values.enabled) (.Values.job.enabled) -}}
+{{- if .Values.cron.enabled -}}
+{{ fail "only one of 'job'/'cron' can be enabled at the same time" }}
+{{- end -}}
 apiVersion: {{ .Values.job.apiVersion | quote }}
 kind: Job
 metadata:
@@ -63,10 +66,19 @@ spec:
             - name: postgres-cert-conf
               mountPath: {{ .Values.postgres.sslAuth.mountPath }}
           {{- end }}
+          {{- if .Values.pvc.enabled }}
+            - name: planet-dumper-storage
+              mountPath: /workdir
+          {{- end }}
       volumes:
         {{- if .Values.postgres.sslAuth.enabled }}
         - name: postgres-cert-conf
           secret:
             secretName: {{ .Values.postgres.sslAuth.secretName }}
+        {{- end }}
+        {{- if .Values.pvc.enabled }}
+        - name: planet-dumper-storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.name | quote }}
         {{- end }}
 {{- end -}}

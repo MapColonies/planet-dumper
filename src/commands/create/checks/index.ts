@@ -1,14 +1,12 @@
 import { isWebUri } from 'valid-url';
-import { Arguments } from 'yargs';
 import { CheckError } from '../../../common/errors';
-import { CreateArguments } from '../create';
+import { CheckFunc } from '../../../wrappers/check';
+import { CreateArguments } from '../createFactory';
 
 const DUMP_SERVER_URI_CHECK_ARG = 'dump-server-endpoint';
 const HTTP_HEADERS_CHECK_ARG = 'dump-server-headers';
 
 const HEADER_KEY_VALUE_PAIR_LENGTH = 2;
-
-export type CheckFunc<T> = (argv: Arguments<T>) => boolean;
 
 export const dumpServerUriCheck: CheckFunc<CreateArguments> = (argv) => {
   const { dumpServerEndpoint } = argv;

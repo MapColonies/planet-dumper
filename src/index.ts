@@ -5,9 +5,8 @@ import './common/tracing';
 import { hideBin } from 'yargs/helpers';
 import { Logger } from '@map-colonies/js-logger';
 import { DependencyContainer } from 'tsyringe';
-import { ExitCodes, EXIT_CODE, SERVICES } from './common/constants';
+import { ExitCodes, EXIT_CODE, ON_SIGNAL, SERVICES } from './common/constants';
 import { getCli } from './cli';
-import { ShutdownHandler } from './common/shutdownHandler';
 
 let depContainer: DependencyContainer | undefined;
 
@@ -29,9 +28,9 @@ void getCli()
     errorLogger({ msg: '😢 - failed initializing the server', err: error });
   })
   .finally(() => {
-    if (depContainer?.isRegistered(ShutdownHandler) === true) {
-      const shutdownHandler = depContainer.resolve(ShutdownHandler);
-      void shutdownHandler.onShutdown().then(() => {
+    if (depContainer?.isRegistered(ON_SIGNAL) === true) {
+      const shutDown: () => Promise<void> = depContainer.resolve(ON_SIGNAL);
+      void shutDown().then(() => {
         exitProcess();
       });
     }

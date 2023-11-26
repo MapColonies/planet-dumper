@@ -1,48 +1,93 @@
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
-import { NG_DUMPS_PATH, PG_DUMPS_PATH, SERVICES, STATE_FILE_NAME } from '../../common/constants';
+import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
+import { AxiosInstance } from 'axios';
+import { NG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
 import { DumpServerClient } from '../../httpClient/dumpClient';
 import { S3ClientWrapper } from '../../s3client/s3Client';
-import { CommandRunner } from '../../common/commandRunner';
-import { BucketDoesNotExistError, InvalidStateFileError, ObjectKeyAlreadyExistError, PgDumpError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpServerConfig } from '../../common/interfaces';
+import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, OsmiumError, PlanetDumpNgError } from '../../common/errors';
+import { DumpMetadata, DumpServerConfig, IConfig, NgDumpConfig, OsmiumConfig } from '../../common/interfaces';
 import { Executable } from '../../common/types';
-import { fetchSequenceNumber, streamToString } from '../../common/util';
-
-export const CREATE_MANAGER_FACTORY = Symbol('CreateManagerFactory');
+import { PgDumpManager } from '../pgDump/pgDumpManager';
+import { nameFormat } from '../common/helpers';
+import { emptyDirectory, createDirectoryIfNotAlreadyExists, getFileSize } from '../../common/util';
 
 @injectable()
-export class CreateManager {
+export class CreateManager extends PgDumpManager {
   public constructor(
-    @inject(SERVICES.LOGGER) private readonly logger: Logger,
-    private readonly s3Client: S3ClientWrapper,
-    private readonly dumpServerClient: DumpServerClient,
-    private readonly commandRunner: CommandRunner
-  ) {}
-
-  public async createPgDump(dumpTableName: string): Promise<string> {
-    this.logger.info({ msg: 'creating pg dump', dumpTableName });
-
-    const executable: Executable = 'pg_dump';
-    const pgDumpOutputPath = join(PG_DUMPS_PATH, dumpTableName);
-    const args = ['--format=custom', `--file=${pgDumpOutputPath}`];
-
-    await this.commandWrapper(executable, args, PgDumpError);
-
-    return pgDumpOutputPath;
+    @inject(SERVICES.LOGGER) logger: Logger,
+    @inject(SERVICES.CONFIG) config: IConfig,
+    @inject(SERVICES.HTTP_CLIENT) axios: AxiosInstance,
+    private readonly s3Client: S3ClientWrapper
+  ) {
+    super(logger, config, axios);
   }
 
-  public async createOsmDump(pgDumpFilePath: string, osmDumpName: string): Promise<string> {
-    this.logger.info({ msg: 'creating ng dump', osmDumpName, pgDumpFilePath });
+  public async createNgDump(
+    outputFormat: string,
+    pgDumpFilePath: string,
+    shouldResume: boolean,
+    shouldCollectInfo: boolean,
+    mediator?: StatefulMediator | undefined
+  ): Promise<string> {
+    await mediator?.reserveAccess();
+
+    const ngDumpName = nameFormat(outputFormat, this.state);
+    const currentNgDumpDir = join(WORKDIR, this.state, NG_DUMP_DIR);
+    const ngDumpOutputPath = join(currentNgDumpDir, ngDumpName);
+    const metadata: Record<string, unknown> = { ngDumpName, ngDumpOutputPath };
+
+    await mediator?.createAction({ state: parseInt(this.state), metadata });
+    await mediator?.removeLock();
+
+    await createDirectoryIfNotAlreadyExists(currentNgDumpDir);
+
+    // if should not resume clear already existing mid dump files
+    if (!shouldResume) {
+      await emptyDirectory(currentNgDumpDir);
+    }
+
+    // execute commmad
+    await this.executeNgDump(pgDumpFilePath, ngDumpOutputPath, shouldResume);
+
+    // collect metadata
+    metadata.size = await getFileSize(ngDumpOutputPath);
+
+    if (shouldCollectInfo) {
+      const collectedInfo = await this.executeOsmium(ngDumpOutputPath);
+      metadata.info = JSON.parse(collectedInfo) as Record<string, unknown>;
+    }
+
+    await mediator?.updateAction({ metadata });
+
+    return ngDumpOutputPath;
+  }
+
+  public async executeNgDump(pgDumpFilePath: string, ngDumpFilePath: string, shouldResume?: boolean): Promise<void> {
+    this.logger.info({ msg: 'creating ng dump', pgDumpFilePath, ngDumpFilePath });
 
     const executable: Executable = 'planet-dump-ng';
-    const osmDumpOutputPath = join(NG_DUMPS_PATH, osmDumpName);
-    const args = [`--dump-file=${pgDumpFilePath}`, `--pbf=${osmDumpOutputPath}`];
+    const globalArgs = this.globalCommandArgs[executable];
+    const args = [...globalArgs, `--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpFilePath}`];
+    const isVerbose = this.config.get<boolean>('ngDump.verbose');
 
-    await this.commandWrapper(executable, args, PlanetDumpNgError);
+    if (shouldResume === true) {
+      args.push('--resume');
+    }
 
-    return osmDumpOutputPath;
+    await this.commandWrapper(executable, args, PlanetDumpNgError, undefined, dirname(ngDumpFilePath), isVerbose);
+  }
+
+  public async executeOsmium(ngDumpFilePath: string): Promise<string> {
+    this.logger.info({ msg: 'collecting ng dump file info', ngDumpFilePath });
+
+    const executable: Executable = 'osmium';
+    const globalArgs = this.globalCommandArgs[executable];
+    const args = [...globalArgs, '--input-format', 'pbf', '--extended', '--json', ngDumpFilePath];
+    const isVerbose = this.config.get<boolean>('osmium.verbose');
+
+    return this.commandWrapper(executable, args, OsmiumError, 'fileinfo', undefined, isVerbose);
   }
 
   public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {
@@ -65,34 +110,27 @@ export class CreateManager {
       dumpMetadata,
     });
 
-    await this.dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
+    const dumpServerClient = new DumpServerClient(this.logger, this.axios);
+    await dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
   }
 
-  public async getSequenceNumber(bucketName: string): Promise<number> {
-    this.logger.info({ msg: 'getting current sequence sequence number from s3', bucketName });
+  protected override processConfig(config: IConfig): void {
+    super.processConfig(config);
 
-    const stateStream = await this.s3Client.getObjectWrapper(bucketName, STATE_FILE_NAME);
-    const stateContent = await streamToString(stateStream);
-    return this.fetchSequenceNumberSafely(stateContent);
-  }
+    const ngDumpConfig = config.get<NgDumpConfig>('ngDump');
 
-  private async commandWrapper(executable: Executable, args: string[], error: new (message?: string) => Error, command?: string): Promise<void> {
-    this.logger.info({ msg: 'executing command', executable, command, args });
+    const ngDumpGlobalArgs = this.globalCommandArgs['planet-dump-ng'];
 
-    const { exitCode } = await this.commandRunner.run(executable, command, args);
-
-    if (exitCode !== 0) {
-      this.logger.error({ msg: 'failure occurred during the execute of command', executable, command, args, executableExitCode: exitCode });
-      throw new error(`an error occurred while running ${executable} with ${command ?? 'undefined'} command, exit code ${exitCode as number}`);
+    if (ngDumpConfig.maxConcurrency) {
+      ngDumpGlobalArgs.push(`--max-concurrency=${ngDumpConfig.maxConcurrency.toString()}`);
     }
-  }
 
-  private fetchSequenceNumberSafely(content: string): number {
-    try {
-      return fetchSequenceNumber(content);
-    } catch (error) {
-      this.logger.error({ err: error, msg: 'failed to fetch sequence number out of the state file' });
-      throw new InvalidStateFileError('could not fetch sequence number out of the state file');
+    const osmiumConfig = config.get<OsmiumConfig>('osmium');
+    const osmiumArgs = this.globalCommandArgs.osmium;
+
+    if (osmiumConfig.verbose) {
+      osmiumArgs.push('--verbose');
     }
+    osmiumArgs.push(`${osmiumConfig.progress ? '--progress' : '--no-progress'}`);
   }
 }

@@ -5,9 +5,18 @@ export interface IConfig {
   has: (setting: string) => boolean;
 }
 
-export interface DumpMetadataOptions {
-  dumpNameFormat: string;
-  stateBucketName?: string;
+export interface LogFn {
+  (obj: unknown, msg?: string, ...args: unknown[]): void;
+  (msg: string, ...args: unknown[]): void;
+}
+
+export interface ILogger {
+  trace?: LogFn;
+  debug: LogFn;
+  info: LogFn;
+  warn: LogFn;
+  error: LogFn;
+  fatal?: LogFn;
 }
 
 export interface S3Config {
@@ -25,6 +34,16 @@ export interface PgDumpConfig {
   verbose: boolean;
 }
 
+export interface NgDumpConfig {
+  verbose: boolean;
+  maxConcurrency: number;
+}
+
+export interface OsmiumConfig {
+  verbose: boolean;
+  progress: boolean;
+}
+
 export interface DumpServerConfig {
   dumpServerEndpoint?: string;
   dumpServerHeaders: string[];
@@ -34,11 +53,13 @@ export interface DumpMetadata {
   name: string;
   bucket?: string;
   timestamp: Date;
-  sequenceNumber?: number;
+  sequenceNumber: number;
 }
 
 export interface ArstotzkaConfig {
   enabled: boolean;
-  serviceId: string;
+  services: {
+    [key: string]: string;
+  };
   mediator: MediatorConfig;
 }

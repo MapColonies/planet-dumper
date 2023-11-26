@@ -1,4 +1,4 @@
-import { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Logger } from '@map-colonies/js-logger';
 import { inject } from 'tsyringe';
 import { HttpUpstreamResponseError, HttpUpstreamUnavailableError } from '../common/errors';
@@ -19,7 +19,7 @@ export interface HttpResponse<R> {
 }
 
 export abstract class BaseClient {
-  public constructor(@inject(SERVICES.LOGGER) public readonly logger: Logger) {}
+  public constructor(@inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance, @inject(SERVICES.LOGGER) public readonly logger: Logger) {}
 
   public invokeHttp = async <R, D, A extends AxiosRequestArgs<D>, F extends (...args: A) => Promise<AxiosResponse<R>>, E = ErrorResponseData>(
     func: F,

@@ -3,10 +3,31 @@ This cli is responsible for creating an osm dump file (pbf format) representing 
 
 This is accomplished by using the [planet-dump-ng](https://github.com/zerebubuth/planet-dump-ng) tool against a postgres backup file created with [pg_dump](https://www.postgresql.org/docs/current/app-pgdump.html).
 
-**supports versions 12, 13 and 14 of postgres**
+**supports versions 12, 13, 14 and 15 of postgres**
 
 ## Usage
 
+### pg_dump
+```
+index.js pg_dump
+
+create a postgres dump from an existing osm database
+
+Options:
+      --version                        Show version number             [boolean]
+  -h, --help                           Show help                       [boolean]
+  -o, --outputFormat, --output-format  The resulting output name format,
+                                       example:
+                                       prefix_{state}_{timestamp}_suffix.pbf
+                                                             [string] [required]
+  -s, --stateSource                    Determines state seqeunce number to
+                                       source            [string] [default: "1"]
+  -c, --cleanupMode                    the command execution cleanup mode
+   [string] [choices: "none", "pre-clean-others", "post-clean-others"] [default:
+                                                                         "none"]
+```
+
+### create
 ```
 index.js create
 
@@ -16,26 +37,20 @@ Options:
       --version                             Show version number        [boolean]
   -h, --help                                Show help                  [boolean]
   -e, --s3Endpoint, --s3-endpoint           The s3 endpoint  [string] [required]
-  -b, --s3BucketName, --s3-bucket-name      The bucket name containing the state
-                                            and the lua script
-                                                             [string] [required]
+  -b, --s3BucketName, --s3-bucket-name      The bucket the resulting dump will
+                                            be uploaded to   [string] [required]
   -a, --s3Acl, --s3-acl                     The canned acl policy for uploaded
                                             objects
   [choices: "authenticated-read", "private", "public-read", "public-read-write"]
                                                             [default: "private"]
   -s, --dumpServerEndpoint,                 The endpoint of the dump-server
   --dump-server-endpoint                                                [string]
-      --dumpServerHeaders, --dsh,           The headers to attach to the
-      --dump-server-headers                 dump-server request
+  -H, --dumpServerHeaders,                  The headers to attach to the
+  --dump-server-headers                     dump-server request
                                                            [array] [default: []]
-  -n, --dumpNameFormat, --dump-name-format  The resulting dump name format,
-                                            example:
-                                            prefix_{timestamp}_suffix.pbf
-                                                             [string] [required]
-      --stateBucketName, --sbn,             Determines state seqeunce number
-      --state-bucket-name                   according to this bucket state file,
-                                            locks the bucket until creation
-                                            completes                   [string]
+  -c, --cleanupMode                         the command execution cleanup mode
+             [string] [choices: "none", "pre-clean-others", "post-clean-others",
+                       "post-clean-workdir", "post-clean-all"] [default: "none"]
 ```
 
 ## Cli Environment Variables
@@ -59,6 +74,7 @@ Required environment variables:
 Optional environment variables:
 
 - `PG_DUMP_VERBOSE` - verbose flag for pg_dump defaults to false
+- `NG_DUMP_MAX_CONCURRENCY` - maximum number of disk writing threads to run for *each* table
 - `HTTP_CLIENT_TIMEOUT` - http client timeout duration in ms, defaults to 1000ms
 
 Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
@@ -87,10 +103,10 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 ## Building and Running
 
 ### Build argument variables
-- `NODE_VERSION` - the version of node, defaults to 14.
-- `PLANET_DUMP_NG_TAG` - the version of planet-dump-ng, defaults to v1.2.3
-- `POSTGRESQL_VERSION` - the version of postgresql-client to be installed, by default version 13.
-notice that the postgresql-client version should be determined by your postgresql database version, tested on versions 12, 13 and 14 of postgres.
+- `NODE_VERSION` - the version of node, defaults to 16
+- `PLANET_DUMP_NG_TAG` - the version of planet-dump-ng, defaults to v1.2.7
+- `POSTGRESQL_VERSION` - the version of postgresql-client to be installed, by default version 15
+notice that the postgresql-client version should be determined by your postgresql database version, tested on versions 12, 13, 14 and 15 of postgres.
 
 ### Building the container
 

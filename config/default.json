@@ -23,9 +23,19 @@
   "pgDump": {
     "verbose": false
   },
+  "ngDump": {
+    "verbose": false
+  },
+  "osmium": {
+    "verbose": false,
+    "progress": false
+  },
   "arstotzka": {
     "enabled": false,
-    "serviceId": "serviceId",
+    "services": {
+      "planetDumperPg": "pgServiceId",
+      "planetDumperNg": "ngServiceId"
+    },
     "mediator": {
       "timeout": 10000,
       "enableRetryStrategy": false,

@@ -41,12 +41,35 @@
       "__format": "boolean"
     }
   },
+  "ngDump": {
+    "verbose": {
+      "__name": "NG_DUMP_VERBOSE",
+      "__format": "boolean"
+    },
+    "maxConcurrency": {
+      "__name": "NG_DUMP_MAX_CONCURRENCY",
+      "__format": "number"
+    }
+  },
+  "osmium": {
+    "verbose": {
+      "__name": "OSMIUM_VERBOSE",
+      "__format": "boolean"
+    },
+    "progress": {
+      "__name": "OSMIUM_PROGRESS",
+      "__format": "boolean"
+    }
+  },
   "arstotzka": {
     "enabled": {
       "__name": "ARSTOTZKA_ENABLED",
       "__format": "boolean"
     },
-    "serviceId": "ARSTOTZKA_SERVICE_ID",
+    "services": {
+      "__name": "ARSTOTZKA_SERVICES",
+      "__format": "json"
+    },
     "mediator": {
       "timeout": {
         "__name": "MEDIATOR_TIMEOUT",
