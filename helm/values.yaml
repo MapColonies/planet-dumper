@@ -85,6 +85,9 @@ s3:
   protocol: http
   bucketName: planet-dumps
   acl: private
+  upload:
+    concurrency: 4
+    partSize: 5 # in mb
 
 pvc:
   enabled: true

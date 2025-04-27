@@ -1,5 +1,4 @@
 import { join } from 'path';
-import fsPromises from 'fs/promises';
 import { Argv, CommandModule, Arguments } from 'yargs';
 import { Logger } from '@map-colonies/js-logger';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
@@ -142,8 +141,7 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
       const metadata = buildDumpMetadata(outputFormat, state);
 
       // s3 upload
-      const ngDumpBuffer = await fsPromises.readFile(ngDumpFilePath);
-      await manager.uploadBufferToS3(ngDumpBuffer, s3BucketName, metadata.name, s3Acl);
+      await manager.uploadDumpToS3(ngDumpFilePath, s3BucketName, metadata.name, s3Acl);
 
       // dump server upload
       if (dumpServerEndpoint !== undefined) {

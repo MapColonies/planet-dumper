@@ -29,4 +29,6 @@ data:
   NG_DUMP_MAX_CONCURRENCY: {{ .Values.env.ngDump.maxConcurrency | quote }}
   OSMIUM_VERBOSE: {{ .Values.env.osmium.verbose | quote }}
   OSMIUM_PROGRESS: {{ .Values.env.osmium.progress | quote }}
+  S3_UPLOAD_CONCURRENCY: {{ .Values.s3.upload.concurrency | quote }}
+  S3_UPLOAD_PART_SIZE: {{ .Values.s3.upload.partSize | quote }}
 {{- end -}}

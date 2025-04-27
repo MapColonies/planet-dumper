@@ -1,4 +1,5 @@
 import { join, dirname } from 'path';
+import { createReadStream } from 'fs';
 import { inject, injectable } from 'tsyringe';
 import { Logger } from '@map-colonies/js-logger';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
@@ -90,7 +91,7 @@ export class CreateManager extends PgDumpManager {
     return this.commandWrapper(executable, args, OsmiumError, 'fileinfo', undefined, isVerbose);
   }
 
-  public async uploadBufferToS3(buffer: Buffer, bucketName: string, key: string, acl: string): Promise<void> {
+  public async uploadDumpToS3(path: string, bucketName: string, key: string, acl: string): Promise<void> {
     this.logger.info({ msg: 'uploading file to bucket', bucketName, key, acl });
 
     if (!(await this.s3Client.validateExistance('bucket', bucketName))) {
@@ -101,7 +102,9 @@ export class CreateManager extends PgDumpManager {
       throw new ObjectKeyAlreadyExistError(`object key ${key} already exist on specified bucket`);
     }
 
-    await this.s3Client.putObjectWrapper(bucketName, key, buffer, acl);
+    const fileStream = createReadStream(path);
+
+    await this.s3Client.uploadStreamInParallel(bucketName, key, fileStream, acl);
   }
 
   public async registerOnDumpServer(dumpServerConfig: Required<DumpServerConfig>, dumpMetadata: DumpMetadata): Promise<void> {

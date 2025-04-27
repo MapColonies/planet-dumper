@@ -1,4 +1,3 @@
-import { createWriteStream } from 'fs';
 import * as readline from 'readline';
 import { PassThrough } from 'stream';
 import execa, { ExecaChildProcess } from 'execa';
