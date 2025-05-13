@@ -85,6 +85,8 @@ RUN ln -s /osmium-tool/build/osmium /bin/osmium
 
 RUN apt-get update \
     && apt-get install -y gnupg \
+    curl \
+    ca-certificates \
     lsb-release \
     libxml2-dev \
     libboost-program-options-dev \
@@ -95,8 +97,10 @@ RUN apt-get update \
     libosmpbf-dev \
     wget \
     && apt-get clean all \
-    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
-    && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && . /etc/os-release \
+    && sh -c "echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main' > /etc/apt/sources.list.d/pgdg.list" \
     && apt-get update \
     && apt-get -y install postgresql-client-${POSTGRESQL_VERSION}
 

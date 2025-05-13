@@ -61,6 +61,18 @@
       "__format": "boolean"
     }
   },
+  "s3": {
+    "upload": {
+      "concurrency": {
+        "__name": "S3_UPLOAD_CONCURRENCY",
+        "__format": "number"
+      },
+      "partSize": {
+        "__name": "S3_UPLOAD_PART_SIZE",
+        "__format": "number"
+      }
+    }
+  },
   "arstotzka": {
     "enabled": {
       "__name": "ARSTOTZKA_ENABLED",
