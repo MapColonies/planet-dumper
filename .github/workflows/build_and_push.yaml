@@ -1,19 +1,31 @@
-name: Build-and-push
+name: Build and push artifacts
 
 on:
-  create:
+  push:
     tags:
+      - 'v*'
+
+  workflow_dispatch:
+    inputs:
+      version:
+        required: true
+        type: string
+env:
+  HELM_EXPERIMENTAL_OCI: 1
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
+  build_and_push_docker:
+    uses: MapColonies/shared-workflows/.github/workflows/build-and-push-docker.yaml@v4
+    secrets: inherit
+    with:
+      scope: vector
 
-  build_and_test:
-    runs-on: ubuntu-latest
-
-
-    steps:
-        - name: Azure Pipelines Action
-          uses: Azure/pipelines@v1
-          with:
-            azure-devops-project-url: https://dev.azure.com/Libot-Mipui-Org/planet-dumper
-            azure-pipeline-name: 'build-and-push-to-ACR'
-            azure-devops-token: ${{ secrets.AZURE_DEVOPS_TOKEN }}
+  build_and_push_helm:
+    uses: MapColonies/shared-workflows/.github/workflows/build-and-push-helm.yaml@v4
+    secrets: inherit
+    with:
+      scope: vector
