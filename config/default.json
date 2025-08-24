@@ -30,6 +30,12 @@
     "verbose": false,
     "progress": false
   },
+  "s3": {
+    "upload": {
+      "concurrency": 4,
+      "partSize": 5
+    }
+  },
   "arstotzka": {
     "enabled": false,
     "services": {
