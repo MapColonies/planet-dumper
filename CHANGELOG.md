@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.1.0](https://github.com/MapColonies/planet-dumper/compare/v6.0.0...v6.1.0) (2025-08-24)
+
+
+### Features
+
+* dump upload as stream in parallel ([#38](https://github.com/MapColonies/planet-dumper/issues/38)) ([f9a2cc6](https://github.com/MapColonies/planet-dumper/commit/f9a2cc62102d5b5e4a5a7c7f56fecb78e4c402cd))
+
+
+### Bug Fixes
+
+* dockerfile pg repository ([6847d98](https://github.com/MapColonies/planet-dumper/commit/6847d98c1844f0d334ff77484172abad82e8fe73))
+
 ## [6.0.0](https://github.com/MapColonies/planet-dumper/compare/v5.1.1...v6.0.0) (2023-11-26)
 
 
