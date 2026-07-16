@@ -1,8 +1,9 @@
-import * as readline from 'readline';
-import { PassThrough } from 'stream';
-import execa, { ExecaChildProcess } from 'execa';
-import { ILogger } from '../common/interfaces';
-import { NOT_FOUND_INDEX } from '../common/constants';
+import * as readline from 'node:readline';
+import { PassThrough } from 'node:stream';
+import type { ExecaChildProcess } from 'execa';
+import execa from 'execa';
+import type { ILogger } from './interfaces';
+import { NOT_FOUND_INDEX } from './constants';
 
 const children: { executable: string; childProcess: ExecaChildProcess }[] = [];
 

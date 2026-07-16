@@ -4,3 +4,7 @@ description: A Helm chart for planet-dumper job
 type: application
 version: 6.1.0
 appVersion: 6.1.0
+dependencies:
+  - name: mclabels
+    version: 1.0.1
+    repository: oci://acrarolibotnonprod.azurecr.io/helm/infra

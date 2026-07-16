@@ -1,11 +1,14 @@
 {
   "telemetry": {
+    "shared": {
+      "serviceName": "planet-dumper"
+    },
     "logger": {
       "level": "info",
       "prettyPrint": false
     },
     "tracing": {
-      "enabled": false,
+      "isEnabled": false,
       "url": "http://localhost:4318/v1/trace"
     }
   },

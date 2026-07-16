@@ -4,39 +4,44 @@ global:
   metrics: {}
   environment: {}
 
+mclabels:
+  component: backend
+  partOf: planet-dumper
+  owner: vector
+  prometheus:
+    enabled: true
+
 enabled: true
 environment: development
 
 jobAnnotations: {}
 podAnnotations: {}
-cronAnnotations: {}
+deploymentAnnotations: {}
 
 cloudProvider:
   flavor: openshift
-  dockerRegistryUrl: my-registry-url.io
+  dockerRegistryUrl: acrarolibotnonprod.azurecr.io
 
 image:
-  repository: planet-dumper
+  repository: planet-dumper-pg15
   # Overrides the image tag whose default is the chart appVersion.
-  # tag: 'latest'
+  tag: 'v6.0.0-rc1'
   pullPolicy: IfNotPresent
 
 job:
-  enabled: true
+  enabled: false
   apiVersion: 'batch/v1' # depends on openshift version batch/v1 or batch/v1beta1
   restartPolicy: OnFailure
   ttlSecondsAfterFinished: 60
   backoffLimit: 6
-
+# deploys an always-running Deployment (a single pod) which schedules the dump
+# pipeline itself, in-process, via node-cron - replaces the old k8s CronJob model.
+# only one of 'job'/'cron' can be enabled at the same time.
 cron:
-  enabled: false
-  apiVersion: 'batch/v1' # depends on openshift version batch/v1 or batch/v1beta1
-  restartPolicy: OnFailure
-  schedule: '* * * * *'
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 3
-  concurrencyPolicy: Forbid
-  startingDeadlineSeconds: 200
+  enabled: true
+  schedule: '*/5 * * * *' # standard cron expression, e.g. '0 3 * * 0' for weekly (every Sunday at 03:00)
+  target: 'create' # which pipeline to run on each tick: 'create' | 'pg_dump'
+  runOnInit: true # run once immediately on pod startup/restart, in addition to the schedule
 
 resources:
   enabled: false
@@ -61,29 +66,29 @@ env:
     verbose: false
   ngDump:
     verbose: false
-    maxConcurrency: 16
+    maxConcurrency: 4
   osmium:
     verbose: false
     progress: false
-
+ 
 postgres:
-  host: localhost
+  host: pg-osmdbt-postgresql
   username: postgres
-  password: postgres
-  database: openstreetmap
-  # port: 5432
+  password: G3CGoRjpbZ
+  database: osm
+  port: 5432
   sslAuth:
     enabled: false
     secretName: secret-name
     mountPath: '/tmp/certs-postgres'
 
 s3:
-  accessKey: accessKey
-  secretKey: secretKey
-  host: s3Host
+  accessKey: vector
+  secretKey: vectorPassword
+  host: 10.8.0.9
   port: 9000
   protocol: http
-  bucketName: planet-dumps
+  bucketName: vector-planet-dumps
   acl: private
   upload:
     concurrency: 4
@@ -91,19 +96,19 @@ s3:
 
 pvc:
   enabled: true
-  name: pvc-name
+  name: vector-planet-dumper-storage
 
 cli:
-  command: 'create'
+  command: 'pg_dump' # which command the one-shot Job runs ('create' | 'pg_dump'); only applies when job.enabled is true
   outputFormat: dump_{state}_{timestamp}.pbf
-  stateSource: https://osm-diffs.com/state.txt # replication url or specific state number
+  stateSource: 1 # replication url or specific state number
   cleanupMode: 'none'
   create:
     resume: false
     info: false
     dumpServer:
       enabled: true
-      endpoint: http://dump-server.com
+      endpoint: https://test-dump-server-dump-server-route-vector-dev.apps.j1lk3njp.eastus.aroapp.io/
       attachHeaders: false
       headers: X-API-KEY=apikey
 

@@ -10,12 +10,13 @@ export const CLI_BUILDER = Symbol('cliBuilder');
 export const EXIT_CODE = Symbol('exitCode');
 export const ON_SIGNAL = Symbol('onSignal');
 
-export const SERVICES: Record<string, symbol> = {
+export const SERVICES = {
   LOGGER: Symbol('Logger'),
   CONFIG: Symbol('Config'),
   S3: Symbol('S3'),
   HTTP_CLIENT: Symbol('HttpClient'),
   ARSTOTZKA: Symbol('Arstotzka'),
+  TRACER: Symbol('Tracer'),
 };
 
 export const ExitCodes = {

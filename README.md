@@ -53,6 +53,33 @@ Options:
                        "post-clean-workdir", "post-clean-all"] [default: "none"]
 ```
 
+### schedule
+Runs the `create` or `pg_dump` pipeline repeatedly on a cron schedule, in-process (using [node-cron](https://github.com/merencia/node-cron)), instead of exiting after a single run. Accepts every option from `create`/`pg_dump` above (only the options relevant to `--target` are required), plus:
+```
+index.js schedule
+
+run the create or pg_dump pipeline repeatedly on a cron schedule
+
+Options:
+      --version                             Show version number        [boolean]
+  -h, --help                                Show help                  [boolean]
+      --target                              which pipeline to run on each
+                                            scheduled tick
+                              [string] [required] [choices: "create", "pg_dump"]
+      --cronExpression, --cron-expression   a cron expression controlling the
+                                            schedule         [string] [required]
+      --runOnInit, --run-on-init            immediately run the pipeline once at
+                                            startup, before waiting for the
+                                            first scheduled tick
+                                                      [boolean] [default: false]
+```
+A tick is skipped (with a warning logged) if the previous run is still in progress, so runs never overlap. The process shuts down gracefully on `SIGTERM`/`SIGINT`.
+
+## Deployment Modes
+
+- One-shot (`pg_dump`/`create`): for manual or CI-triggered runs, or a Kubernetes `Job`. The process exits after a single run.
+- Recurring (`schedule`): for a long-running Kubernetes `Deployment` (a single always-on pod) that schedules its own dumps internally — no external scheduler needed.
+
 ## Cli Environment Variables
 
 Any option that can be set using the cli command line, can be also set by writing its value in `SNAKE_CASE`.
@@ -60,28 +87,37 @@ For example, the option `--s3-bucket-name` can be set by using the `S3_BUCKET_NA
 
 ## Configuration
 
+Application configuration (as opposed to per-invocation CLI options) is validated against the
+[`vector/planetDumper`](https://github.com/MapColonies/schemas) schema via
+[`@map-colonies/config`](https://github.com/MapColonies/config). Defaults live in `config/default.json`;
+every field's environment variable override is defined on the schema itself (`x-env-value`), so there is
+no separate `custom-environment-variables.json` to keep in sync. By default the app runs in offline mode
+(reading only the local `config/` files, no config-server dependency) - set `CONFIG_OFFLINE_MODE=false`
+and `CONFIG_SERVER_URL` to use a remote config-server instead.
+
 **Env Variables**
 
-Required environment variables:
+Required environment variables (native to `pg_dump`/`psql`, not part of the schema-managed config -
+these are read directly by the postgres binaries, not by planet-dumper's own code):
 
 - `PGHOST` - Database host
 - `PGDATABASE` - Database name
 - `PGUSER` - Database user
 - `PGPASSWORD` - Database user's password
 - `PGPORT` - Database's port
-- `POSTGRES_ENABLE_SSL_AUTH` - flag for enabling postgres certificate, auth set as 'true' for enabling any other value will be falsy
 
 Optional environment variables:
 
+- `POSTGRES_ENABLE_SSL_AUTH` - flag for enabling postgres certificate auth, defaults to `false`
 - `PG_DUMP_VERBOSE` - verbose flag for pg_dump defaults to false
 - `NG_DUMP_MAX_CONCURRENCY` - maximum number of disk writing threads to run for *each* table
 - `HTTP_CLIENT_TIMEOUT` - http client timeout duration in ms, defaults to 1000ms
 
 Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 
-- `POSTGRES_SSL_CERT` - path to cert file
-- `POSTGRES_SSL_KEY` - path to cert auth kay
-- `POSTGRES_SSL_ROOT_CERT` - path to root cert
+- `POSTGRES_CA_PATH` - path to the root CA certificate file
+- `POSTGRES_CERT_PATH` - path to the client certificate file
+- `POSTGRES_KEY_PATH` - path to the client certificate key file
 
 **Exit Codes:**
 
@@ -103,7 +139,7 @@ Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 ## Building and Running
 
 ### Build argument variables
-- `NODE_VERSION` - the version of node, defaults to 16
+- `NODE_VERSION` - the version of node, defaults to 24
 - `PLANET_DUMP_NG_TAG` - the version of planet-dump-ng, defaults to v1.2.7
 - `POSTGRESQL_VERSION` - the version of postgresql-client to be installed, by default version 15
 notice that the postgresql-client version should be determined by your postgresql database version, tested on versions 12, 13, 14 and 15 of postgres.

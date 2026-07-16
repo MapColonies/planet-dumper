@@ -4,19 +4,26 @@
   "description": "a cli wrapper for planet-dump-ng and pg_dump functionality",
   "main": "./src/index.ts",
   "scripts": {
+    "test:unit": "vitest run --coverage.enabled=false --project unit",
+    "test:integration": "vitest run --coverage.enabled=false --project integration",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "prelint:fix": "npm run format:fix",
     "prelint": "npm run format",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
-    "release": "standard-version",
     "prebuild": "npm run clean",
-    "build": "tsc --project tsconfig.build.json && npm run assets:copy",
-    "start": "npm run build && cd dist && node ./index.js",
+    "build": "tsc --project tsconfig.build.json && tsc-alias -p tsconfig.build.json && npm run assets:copy",
+    "start": "npm run build && cd dist && node --import ./instrumentation.mjs ./index.js",
     "assets:copy": "copyfiles -f ./config/* ./dist/config && copyfiles ./package.json dist",
     "clean": "rimraf dist",
-    "install": "npx husky install"
+    "prepare": "node .husky/install.mjs"
+  },
+  "directories": {
+    "test": "tests"
   },
   "repository": {
     "type": "git",
@@ -24,12 +31,6 @@
   },
   "author": "MapColonies",
   "license": "ISC",
-  "husky": {
-    "hooks": {
-      "pre-commit": "pretty-quick --staged",
-      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
-    }
-  },
   "config": {
     "commitizen": {
       "path": "./node_modules/cz-conventional-changelog"
@@ -41,43 +42,47 @@
     "@map-colonies/arstotzka-common": "^1.0.0",
     "@map-colonies/arstotzka-mediator": "^1.0.0",
     "@map-colonies/cleanup-registry": "^1.1.0",
-    "@map-colonies/js-logger": "^0.0.5",
-    "@map-colonies/read-pkg": "0.0.1",
-    "@map-colonies/telemetry": "4.1.0",
-    "@opentelemetry/api": "1.1.0",
-    "@opentelemetry/api-metrics": "0.29.0",
+    "@map-colonies/config": "^4.0.1",
+    "@map-colonies/js-logger": "^5.0.0",
+    "@map-colonies/read-pkg": "^2.0.0",
+    "@map-colonies/schemas": "https://ghatmpstorage.blob.core.windows.net/npm-packages/schemas-6395dac251cc6ab21aa74cdb5b844fc8886c2025.tgz",    
+    "@map-colonies/tracing": "^1.0.0",
+    "@map-colonies/tracing-utils": "^1.0.0",
+    "@opentelemetry/api": "^1.9.1",
     "axios": "^0.24.0",
     "better-ajv-errors": "^1.1.2",
     "concat-stream": "^2.0.0",
-    "config": "^3.3.6",
     "execa": "^5.1.1",
+    "node-cron": "^4.2.1",
     "reflect-metadata": "^0.1.13",
     "string-format": "^2.0.0",
-    "tsyringe": "^4.6.0",
+    "tsyringe": "^4.10.0",
     "valid-url": "^1.0.9",
     "yargs": "^17.1.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^13.2.1",
-    "@commitlint/config-conventional": "^13.2.0",
-    "@map-colonies/eslint-config": "^3.1.1",
-    "@map-colonies/prettier-config": "0.0.1",
-    "@map-colonies/standard-version-update-helm-version": "^2.0.1",
+    "@commitlint/cli": "^21.2.1",
+    "@map-colonies/commitlint-config": "^2.0.1",
+    "@map-colonies/eslint-config": "^9.0.0",
+    "@map-colonies/eslint-plugin": "^1.0.0",
+    "@map-colonies/prettier-config": "^1.0.0",
+    "@map-colonies/tsconfig": "^2.0.0",
     "@types/concat-stream": "^1.6.1",
-    "@types/config": "0.0.39",
     "@types/express": "^4.17.13",
     "@types/string-format": "^2.0.0",
     "@types/valid-url": "^1.0.3",
     "@types/yargs": "^17.0.2",
-    "commitlint": "^13.2.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/ui": "^4.1.10",
     "copyfiles": "^2.4.1",
     "cz-conventional-changelog": "^3.3.0",
-    "eslint": "^8.15.0",
-    "husky": "^7.0.2",
-    "prettier": "^2.4.1",
-    "pretty-quick": "^3.1.1",
+    "eslint": "^10.7.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.9.5",
+    "pretty-quick": "^4.2.2",
     "rimraf": "^3.0.2",
-    "standard-version": "^9.3.2",
-    "typescript": "^4.6.4"
+    "tsc-alias": "^1.9.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   }
 }
