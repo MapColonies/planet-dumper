@@ -1,6 +1,6 @@
-import { Arguments } from 'yargs';
-import { CheckError } from '../common/errors';
-import { ILogger } from '../common/interfaces';
+import type { Arguments } from 'yargs';
+import { CheckError } from '@common/errors';
+import type { ILogger } from '@common/interfaces';
 
 export type CheckFunc<T> = (argv: Arguments<T>) => true;
 

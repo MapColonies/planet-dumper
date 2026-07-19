@@ -1,7 +1,7 @@
 import { isWebUri } from 'valid-url';
-import { CheckError } from '../../../common/errors';
-import { CheckFunc } from '../../../wrappers/check';
-import { GlobalArguments } from '../types';
+import { CheckError } from '@common/errors';
+import type { CheckFunc } from '@src/wrappers/check';
+import type { GlobalArguments } from '../types';
 
 const STATE_SOURCE_CHECK_ARG = 'state-source';
 

@@ -1,0 +1,93 @@
+{{- $releaseName := .Release.Name -}}
+{{- $chartName := include "planet-dumper.name" . -}}
+{{- $cloudProviderFlavor := include "planet-dumper.cloudProviderFlavor" . -}}
+{{- $cloudProviderDockerRegistryUrl := include "planet-dumper.cloudProviderDockerRegistryUrl" . -}}
+{{- $tag := include "planet-dumper.tag" . -}}
+{{- if and (.Values.enabled) (.Values.cron.enabled) -}}
+{{- if .Values.job.enabled -}}
+{{ fail "only one of 'job'/'cron' can be enabled at the same time" }}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $releaseName }}-{{ $chartName }}
+  labels:
+    app: {{ $chartName }}
+    component: {{ $chartName }}
+    environment: {{ include "planet-dumper.environment" . }}
+    release: {{ $releaseName }}
+    {{- include "planet-dumper.labels" . | nindent 4 }}
+{{- with .Values.deploymentAnnotations }}
+  annotations:
+    {{ include "mclabels.annotations" . | nindent 8 }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  # always exactly one replica: this is a singleton scheduler, running more than one
+  # replica would arm more than one cron schedule against the same DB/bucket
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "planet-dumper.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "planet-dumper.selectorLabels" . | nindent 8 }}
+{{- with .Values.podAnnotations }}
+      annotations:
+{{ toYaml . | indent 8 }}
+{{- end }}
+    spec:
+      containers:
+        - name: {{ $releaseName }}-{{ $chartName }}-deployment
+          {{- with .Values.image }}
+          {{- if ne $cloudProviderFlavor "minikube" }}
+          image: {{ $cloudProviderDockerRegistryUrl }}/{{ .repository }}:{{ $tag }}
+          {{- else }}
+          image: {{ .repository }}:{{ $tag }}
+          {{- end }}
+          {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - schedule
+          envFrom:
+            - configMapRef:
+                name: {{ $releaseName }}-{{ $chartName }}-configmap
+            - configMapRef:
+                name: {{ $releaseName }}-{{ $chartName }}-command-options-configmap
+            - configMapRef:
+                name: {{ $releaseName }}-{{ $chartName }}-arstotzka-configmap
+            {{- if and .Values.arstotzka.enabled .Values.arstotzka.networkCM }}
+            - configMapRef:
+                name: {{ .Values.arstotzka.networkCM }}
+            {{- end }}
+            - secretRef:
+                name: {{ $releaseName }}-{{ $chartName }}-secret
+          {{- if .Values.resources.enabled }}
+          resources:
+            {{- toYaml .Values.resources.value | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+          {{- if .Values.postgres.sslAuth.enabled }}
+            - name: postgres-cert-conf
+              mountPath: {{ .Values.postgres.sslAuth.mountPath }}
+          {{- end }}
+          {{- if .Values.pvc.enabled }}
+            - name: planet-dumper-storage
+              mountPath: /workdir
+              {{- if .Values.pvc.subPath }}
+              subPath: {{ .Values.pvc.subPath | quote }}
+              {{- end }}
+          {{- end }}
+      volumes:
+        {{- if .Values.postgres.sslAuth.enabled }}
+        - name: postgres-cert-conf
+          secret:
+            secretName: {{ .Values.postgres.sslAuth.secretName }}
+        {{- end }}
+        {{- if .Values.pvc.enabled }}
+        - name: planet-dumper-storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.name | quote }}
+        {{- end }}
+{{- end -}}

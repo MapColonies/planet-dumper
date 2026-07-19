@@ -1,12 +1,12 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { inject, injectable } from 'tsyringe';
-import { Logger } from '@map-colonies/js-logger';
-import { AxiosInstance } from 'axios';
+import type { Logger } from '@map-colonies/js-logger';
+import type { AxiosInstance } from 'axios';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
-import { EMPTY_STRING, PG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
-import { InvalidStateFileError, PgDumpError } from '../../common/errors';
-import { Executable } from '../../common/types';
+import { EMPTY_STRING, PG_DUMP_DIR, SERVICES, WORKDIR } from '@common/constants';
+import { InvalidStateFileError, PgDumpError } from '@common/errors';
+import type { Executable } from '@common/types';
 import {
   createDirectoryIfNotAlreadyExists,
   fetchSequenceNumber,
@@ -14,21 +14,23 @@ import {
   listFilesInDirectory,
   removeDirectory,
   streamToString,
-} from '../../common/util';
-import { spawnChild } from '../../common/spawner';
-import { IConfig, ILogger, PgDumpConfig, PostgresConfig } from '../../common/interfaces';
+} from '@common/util';
+import { spawnChild } from '@common/spawner';
+import type { ILogger } from '@common/interfaces';
+import type { ConfigType } from '@common/config';
 import { nameFormat } from '../common/helpers';
 
 @injectable()
 export class PgDumpManager {
   public state = EMPTY_STRING;
+  public readonly timestamp = new Date();
 
   // eslint-disable-next-line @typescript-eslint/naming-convention
   protected readonly globalCommandArgs: Record<Executable, string[]> = { pg_dump: [], 'planet-dump-ng': [], osmium: [] };
 
   public constructor(
     @inject(SERVICES.LOGGER) public readonly logger: Logger,
-    @inject(SERVICES.CONFIG) public readonly config: IConfig,
+    @inject(SERVICES.CONFIG) public readonly config: ConfigType,
     @inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance
   ) {
     this.processConfig(config);
@@ -41,8 +43,8 @@ export class PgDumpManager {
     if (shouldResume) {
       const existingPgDumps = await listFilesInDirectory(currentPgDumpDir);
 
-      if (existingPgDumps.length > 0) {
-        const pgDumpFilePath = existingPgDumps[0];
+      const pgDumpFilePath = existingPgDumps[0];
+      if (pgDumpFilePath !== undefined) {
         this.logger.info({ msg: 'resuming from an existing pg dump', pgDumpFilePath, pgDumpDirList: existingPgDumps });
         return pgDumpFilePath;
       }
@@ -50,7 +52,7 @@ export class PgDumpManager {
 
     await mediator?.reserveAccess();
 
-    const pgDumpName = nameFormat(outputFormat, this.state);
+    const pgDumpName = nameFormat(outputFormat, this.timestamp, this.state);
     const pgDumpOutputPath = join(currentPgDumpDir, pgDumpName);
     const metadata = { pgDumpName, pgDumpOutputPath };
 
@@ -120,8 +122,8 @@ export class PgDumpManager {
     return stdout;
   }
 
-  protected processConfig(config: IConfig): void {
-    const pgDumpConfig = config.get<PgDumpConfig>('pgDump');
+  protected processConfig(config: ConfigType): void {
+    const pgDumpConfig = config.get('pgDump');
 
     const pgDumpGlobalArgs = this.globalCommandArgs.pg_dump;
 
@@ -129,7 +131,7 @@ export class PgDumpManager {
       pgDumpGlobalArgs.push('--verbose');
     }
 
-    const postgresConfig = config.get<PostgresConfig>('postgres');
+    const postgresConfig = config.get('postgres');
     if (postgresConfig.enableSslAuth) {
       const { cert, key, ca } = postgresConfig.sslPaths;
 
@@ -145,7 +147,7 @@ export class PgDumpManager {
     const executable: Executable = 'pg_dump';
     const globalArgs = this.globalCommandArgs[executable];
     const args = [...globalArgs, '--format=custom', `--file=${pgDumpOutputPath}`];
-    const isVerbose = this.config.get<boolean>('pgDump.verbose');
+    const isVerbose = this.config.get('pgDump.verbose');
 
     await this.commandWrapper(executable, args, PgDumpError, undefined, undefined, isVerbose);
   }
