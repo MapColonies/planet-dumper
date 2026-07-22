@@ -1,6 +1,3 @@
-// This file handles the config and tracing initialization, and starts tracing before the app starts.
-// You should be careful about editing this file, as it is a critical part of the application's functionality.
-// Because this file is a module it should be imported using the `--import` flag in the `node` command, and should not be imported by any other file.
 import { isMainThread } from 'node:worker_threads';
 import { tracingFactory } from './common/tracing.js';
 import { getConfig, initConfig } from './common/config.js';

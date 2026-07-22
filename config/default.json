@@ -1,8 +1,6 @@
 {
   "telemetry": {
-    "shared": {
-      "serviceName": "planet-dumper"
-    },
+    "shared": {},
     "logger": {
       "level": "info",
       "prettyPrint": false
@@ -55,5 +53,10 @@
         "url": "http://locky.com"
       }
     }
+  },
+  "cli": {
+    "outputFormat": "dump_{state}_{timestamp}.pbf",
+    "stateSource": "1",
+    "cleanupMode": "none"
   }
 }

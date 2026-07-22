@@ -7,13 +7,14 @@ import type { AxiosInstance } from 'axios';
 import { NG_DUMP_DIR, SERVICES, WORKDIR } from '@common/constants';
 import { DumpServerClient } from '@src/httpClient/dumpClient';
 import { S3ClientWrapper } from '@src/s3client/s3Client';
+import { FsRepository } from '@src/fsRepository/fsRepository';
 import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, OsmiumError, PlanetDumpNgError } from '@common/errors';
 import type { DumpMetadata, DumpServerConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { Executable } from '@common/types';
-import { emptyDirectory, createDirectoryIfNotAlreadyExists, getFileSize } from '@common/util';
 import { PgDumpManager } from '../pgDump/pgDumpManager';
 import { nameFormat } from '../common/helpers';
+import type { CleanupMode } from '../common/types';
 
 @injectable()
 export class CreateManager extends PgDumpManager {
@@ -21,9 +22,10 @@ export class CreateManager extends PgDumpManager {
     @inject(SERVICES.LOGGER) logger: Logger,
     @inject(SERVICES.CONFIG) config: ConfigType,
     @inject(SERVICES.HTTP_CLIENT) axios: AxiosInstance,
+    fsRepository: FsRepository,
     private readonly s3Client: S3ClientWrapper
   ) {
-    super(logger, config, axios);
+    super(logger, config, axios, fsRepository);
   }
 
   public async createNgDump(
@@ -43,18 +45,18 @@ export class CreateManager extends PgDumpManager {
     await mediator?.createAction({ state: parseInt(this.state), metadata });
     await mediator?.removeLock();
 
-    await createDirectoryIfNotAlreadyExists(currentNgDumpDir);
+    await this.fsRepository.createDirectoryIfNotAlreadyExists(currentNgDumpDir);
 
     // if should not resume clear already existing mid dump files
     if (!shouldResume) {
-      await emptyDirectory(currentNgDumpDir);
+      await this.fsRepository.emptyDirectory(currentNgDumpDir);
     }
 
     // execute commmad
     await this.executeNgDump(pgDumpFilePath, ngDumpOutputPath, shouldResume);
 
     // collect metadata
-    metadata.size = await getFileSize(ngDumpOutputPath);
+    metadata.size = await this.fsRepository.getFileSize(ngDumpOutputPath);
 
     if (shouldCollectInfo) {
       const collectedInfo = await this.executeOsmium(ngDumpOutputPath);
@@ -116,6 +118,23 @@ export class CreateManager extends PgDumpManager {
 
     const dumpServerClient = new DumpServerClient(this.logger, this.axios);
     await dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
+  }
+
+  public override async postCleanup(mode: CleanupMode, state: string): Promise<void> {
+    switch (mode) {
+      case 'post-clean-workdir':
+        await this.fsRepository.emptyDirectory(join(WORKDIR, state));
+        break;
+      case 'post-clean-others':
+        await this.fsRepository.emptyDirectory(WORKDIR, [state]);
+        break;
+      case 'post-clean-all':
+        await this.fsRepository.emptyDirectory(WORKDIR);
+        break;
+      case 'none':
+      case 'pre-clean-others':
+        break;
+    }
   }
 
   protected override processConfig(config: ConfigType): void {

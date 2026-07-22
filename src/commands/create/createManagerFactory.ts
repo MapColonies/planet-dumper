@@ -4,6 +4,7 @@ import type { FactoryFunction } from 'tsyringe';
 import { SERVICES } from '@common/constants';
 import type { ConfigType } from '@common/config';
 import { S3ClientWrapper } from '@src/s3client/s3Client';
+import { FsRepository } from '@src/fsRepository/fsRepository';
 import { CreateManager } from './createManager';
 
 export const CREATE_MANAGER_FACTORY = Symbol('CreateManagerFactory');
@@ -12,6 +13,7 @@ export const createManagerFactory: FactoryFunction<CreateManager> = (dependencyC
   const logger = dependencyContainer.resolve<Logger>(SERVICES.LOGGER);
   const config = dependencyContainer.resolve<ConfigType>(SERVICES.CONFIG);
   const axios = dependencyContainer.resolve<AxiosInstance>(SERVICES.HTTP_CLIENT);
+  const fsRepository = dependencyContainer.resolve(FsRepository);
   const s3Client = dependencyContainer.resolve(S3ClientWrapper);
-  return new CreateManager(logger, config, axios, s3Client);
+  return new CreateManager(logger, config, axios, fsRepository, s3Client);
 };

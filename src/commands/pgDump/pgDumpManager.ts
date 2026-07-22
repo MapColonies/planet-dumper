@@ -7,18 +7,13 @@ import { ActionStatus } from '@map-colonies/arstotzka-common';
 import { EMPTY_STRING, PG_DUMP_DIR, SERVICES, WORKDIR } from '@common/constants';
 import { InvalidStateFileError, PgDumpError } from '@common/errors';
 import type { Executable } from '@common/types';
-import {
-  createDirectoryIfNotAlreadyExists,
-  fetchSequenceNumber,
-  getFileSize,
-  listFilesInDirectory,
-  removeDirectory,
-  streamToString,
-} from '@common/util';
+import { fetchSequenceNumber, streamToString } from '@common/util';
 import { spawnChild } from '@common/spawner';
 import type { ILogger } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
+import { FsRepository } from '@src/fsRepository/fsRepository';
 import { nameFormat } from '../common/helpers';
+import type { CleanupMode } from '../common/types';
 
 @injectable()
 export class PgDumpManager {
@@ -31,7 +26,8 @@ export class PgDumpManager {
   public constructor(
     @inject(SERVICES.LOGGER) public readonly logger: Logger,
     @inject(SERVICES.CONFIG) public readonly config: ConfigType,
-    @inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance
+    @inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance,
+    protected readonly fsRepository: FsRepository
   ) {
     this.processConfig(config);
   }
@@ -41,7 +37,7 @@ export class PgDumpManager {
 
     // resume from existing pg dump if exists
     if (shouldResume) {
-      const existingPgDumps = await listFilesInDirectory(currentPgDumpDir);
+      const existingPgDumps = await this.fsRepository.listFilesInDirectory(currentPgDumpDir);
 
       const pgDumpFilePath = existingPgDumps[0];
       if (pgDumpFilePath !== undefined) {
@@ -60,14 +56,14 @@ export class PgDumpManager {
     await mediator?.removeLock();
 
     // prepare state environment
-    await removeDirectory(currentPgDumpDir);
-    await createDirectoryIfNotAlreadyExists(currentPgDumpDir);
+    await this.fsRepository.removeDirectory(currentPgDumpDir);
+    await this.fsRepository.createDirectoryIfNotAlreadyExists(currentPgDumpDir);
 
     // execute command
     await this.executePgDump(pgDumpOutputPath);
 
     // collect metadata
-    const size = await getFileSize(pgDumpOutputPath);
+    const size = await this.fsRepository.getFileSize(pgDumpOutputPath);
 
     await mediator?.updateAction({ status: ActionStatus.COMPLETED, metadata: { size } });
 
@@ -95,6 +91,18 @@ export class PgDumpManager {
     this.logger.info({ msg: 'state is set to fetched remote url state', state: this.state, stateSourceUrl: stateSource });
 
     return this.state;
+  }
+
+  public async preCleanup(mode: CleanupMode, state: string): Promise<void> {
+    if (mode === 'pre-clean-others') {
+      await this.fsRepository.emptyDirectory(WORKDIR, [state]);
+    }
+  }
+
+  public async postCleanup(mode: CleanupMode, state: string): Promise<void> {
+    if (mode === 'post-clean-others') {
+      await this.fsRepository.emptyDirectory(WORKDIR, [state]);
+    }
   }
 
   public async commandWrapper(

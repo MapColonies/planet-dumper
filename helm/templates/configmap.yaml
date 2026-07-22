@@ -29,6 +29,29 @@ data:
   NG_DUMP_MAX_CONCURRENCY: {{ .Values.env.ngDump.maxConcurrency | quote }}
   OSMIUM_VERBOSE: {{ .Values.env.osmium.verbose | quote }}
   OSMIUM_PROGRESS: {{ .Values.env.osmium.progress | quote }}
-  S3_UPLOAD_CONCURRENCY: {{ .Values.s3.upload.concurrency | quote }}
-  S3_UPLOAD_PART_SIZE: {{ .Values.s3.upload.partSize | quote }}
+  {{- with .Values.s3 }}
+  S3_ENDPOINT: {{ printf "%s://%s:%v/" .protocol .host .port | quote }}
+  S3_BUCKET_NAME: {{ .bucketName | quote }}
+  S3_ACL: {{ .acl | default "private" | quote }}
+  S3_UPLOAD_CONCURRENCY: {{ .upload.concurrency | quote }}
+  S3_UPLOAD_PART_SIZE: {{ .upload.partSize | quote }}
+  {{- end }}
+  OUTPUT_FORMAT: {{ .Values.cli.outputFormat | quote }}
+  STATE_SOURCE: {{ .Values.cli.stateSource | quote }}
+  CLEANUP_MODE: {{ .Values.cli.cleanupMode | quote }}
+  {{- with .Values.cli.create }}
+  RESUME: {{ .resume | quote }}
+  INFO: {{ .info | quote }}
+  {{- if .dumpServer.enabled }}
+  DUMP_SERVER_ENDPOINT: {{ .dumpServer.endpoint | quote }}
+  {{- if .dumpServer.attachHeaders }}
+  DUMP_SERVER_HEADERS: {{ .dumpServer.headers | toJson | quote }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.cron.enabled }}
+  TARGET: {{ .Values.cron.target | quote }}
+  CRON_EXPRESSION: {{ .Values.cron.schedule | quote }}
+  RUN_ON_INIT: {{ .Values.cron.runOnInit | quote }}
+  {{- end }}
 {{- end -}}

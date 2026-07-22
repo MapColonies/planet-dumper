@@ -1,61 +1,57 @@
-import type { Argv, CommandModule, Arguments } from 'yargs';
+import type { CommandModule } from 'yargs';
 import type { Logger } from '@map-colonies/js-logger';
 import type { FactoryFunction } from 'tsyringe';
 import { container } from 'tsyringe';
-import { S3Client } from '@aws-sdk/client-s3';
-import { ExitCodes, EXIT_CODE, S3_REGION, SERVICES } from '@common/constants';
-import { ErrorWithExitCode } from '@common/errors';
-import { check as checkWrapper } from '@src/wrappers/check';
-import type { ArstotzkaConfig, DumpServerConfig, S3Config } from '@common/interfaces';
+import { ExitCodes, EXIT_CODE, SERVICES } from '@common/constants';
+import { ErrorWithExitCode, CheckError } from '@common/errors';
+import type { ArstotzkaConfig } from '@common/interfaces';
+import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
-import type { GlobalArguments } from '../common/types';
-import { CREATE_CLEANUP_CHOICES } from '../common/types';
 import { stateSourceCheck } from '../common/checks';
-import { addCleanupModeOption, addCreateOnlyOptions, addOutputAndStateOptions } from '../common/optionsBuilder';
+import type { CreatePipelineArgs } from '../common/pipelineRunner';
 import { runCreatePipeline } from '../common/pipelineRunner';
 import type { CreateManager } from './createManager';
-import { httpHeadersCheck, dumpServerUriCheck } from './checks';
 import { CREATE_MANAGER_FACTORY } from './createManagerFactory';
 
 export const CREATE_COMMAND_FACTORY = Symbol('CreateCommandFactory');
 
-export interface CreateArguments extends GlobalArguments, S3Config, DumpServerConfig {
-  resume: boolean;
-  info: boolean;
-}
-
-export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments, CreateArguments>> = (dependencyContainer) => {
+export const createCommandFactory: FactoryFunction<CommandModule> = (dependencyContainer) => {
   const command = 'create';
 
   const describe = 'create a pbf dump from an osm database';
 
   const logger = dependencyContainer.resolve<Logger>(SERVICES.LOGGER);
 
-  const builder = (yargs: Argv<CreateArguments>): Argv<CreateArguments> => {
-    addCreateOnlyOptions(addCleanupModeOption(addOutputAndStateOptions(yargs), CREATE_CLEANUP_CHOICES))
-      .demandOption(['s3Endpoint', 's3BucketName'])
-      .check(checkWrapper(stateSourceCheck, logger))
-      .check(checkWrapper(dumpServerUriCheck, logger))
-      .check(checkWrapper(httpHeadersCheck, logger))
-      .middleware((argv) => {
-        const { s3Endpoint } = argv;
-        const client = new S3Client({
-          endpoint: s3Endpoint,
-          region: S3_REGION,
-          forcePathStyle: true,
-        });
-        container.register(SERVICES.S3, { useValue: client });
-      });
-    return yargs;
-  };
+  const handler = async (): Promise<void> => {
+    logger.debug({ msg: 'starting command execution', command });
 
-  const handler = async (args: Arguments<CreateArguments>): Promise<void> => {
-    logger.debug({ msg: 'starting command execution', command, args });
-
+    const config = dependencyContainer.resolve<ConfigType>(SERVICES.CONFIG);
     const arstotzkaConfig = dependencyContainer.resolve<ArstotzkaConfig>(SERVICES.ARSTOTZKA);
-    const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
 
     try {
+      const stateSource = config.get('cli.stateSource');
+      stateSourceCheck(stateSource);
+
+      const s3Endpoint = config.get('s3.endpoint');
+      const s3BucketName = config.get('s3.bucketName');
+      if (s3Endpoint === undefined || s3BucketName === undefined) {
+        throw new CheckError('s3.endpoint and s3.bucketName must be configured to run the create command', 's3', { s3Endpoint, s3BucketName });
+      }
+
+      const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
+
+      const args: CreatePipelineArgs = {
+        outputFormat: config.get('cli.outputFormat'),
+        stateSource,
+        cleanupMode: config.get('cli.cleanupMode'),
+        resume: config.get('cli.resume'),
+        info: config.get('cli.info'),
+        s3BucketName,
+        s3Acl: config.get('s3.acl'),
+        dumpServerEndpoint: config.get('cli.dumpServer.endpoint'),
+        dumpServerHeaders: config.get('cli.dumpServer.headers'),
+      };
+
       await runCreatePipeline(manager, args, logger, arstotzkaConfig);
 
       logger.info({ msg: 'finished command execution successfully', command, args });
@@ -76,7 +72,6 @@ export const createCommandFactory: FactoryFunction<CommandModule<CreateArguments
   return {
     command,
     describe,
-    builder,
     handler,
   };
 };

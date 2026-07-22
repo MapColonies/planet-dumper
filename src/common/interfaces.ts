@@ -14,12 +14,6 @@ export interface ILogger {
   fatal?: LogFn;
 }
 
-export interface S3Config {
-  s3Endpoint: string;
-  s3BucketName: string;
-  s3Acl: string;
-}
-
 export interface DumpServerConfig {
   dumpServerEndpoint?: string;
   dumpServerHeaders: string[];

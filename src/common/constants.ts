@@ -17,7 +17,8 @@ export const SERVICES = {
   HTTP_CLIENT: Symbol('HttpClient'),
   ARSTOTZKA: Symbol('Arstotzka'),
   TRACER: Symbol('Tracer'),
-};
+  CLEANUP_REGISTRY: Symbol('CleanupRegistry'),
+} satisfies Record<string, symbol>;
 
 export const ExitCodes = {
   SUCCESS: 0,

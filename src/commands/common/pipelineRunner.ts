@@ -1,15 +1,12 @@
-import { join } from 'node:path';
 import type { Logger } from '@map-colonies/js-logger';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import type { MediatorConfig } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
-import { WORKDIR } from '@common/constants';
 import type { ArstotzkaConfig } from '@common/interfaces';
-import { emptyDirectory } from '@common/util';
 import type { PgDumpManager } from '../pgDump/pgDumpManager';
 import type { CreateManager } from '../create/createManager';
 import { buildDumpMetadata } from './helpers';
-import type { CleanupMode, ExtendedCleanupMode } from './types';
+import type { CleanupMode } from './types';
 
 const buildMediatorConfig = (mediator: Extract<ArstotzkaConfig, { enabled: true }>['mediator']): MediatorConfig => {
   const { timeout, enableRetryStrategy, retryStrategy, actiony, locky } = mediator;
@@ -31,13 +28,13 @@ const buildMediators = (arstotzkaConfig: ArstotzkaConfig, logger: Logger): { pgM
 export interface PgDumpPipelineArgs {
   outputFormat: string;
   stateSource: string;
-  cleanupMode: CleanupMode | ExtendedCleanupMode;
+  cleanupMode: CleanupMode;
 }
 
 export interface CreatePipelineArgs {
   outputFormat: string;
   stateSource: string;
-  cleanupMode: CleanupMode | ExtendedCleanupMode;
+  cleanupMode: CleanupMode;
   resume: boolean;
   info: boolean;
   s3BucketName: string;
@@ -59,17 +56,11 @@ export const runPgDumpPipeline = async (
   try {
     const state = await manager.getState(stateSource);
 
-    // pre cleanup
-    if (cleanupMode === 'pre-clean-others') {
-      await emptyDirectory(WORKDIR, [state]);
-    }
+    await manager.preCleanup(cleanupMode, state);
 
     await manager.createPgDump(outputFormat, false, pgMediator);
 
-    // post cleanup
-    if (cleanupMode === 'post-clean-others') {
-      await emptyDirectory(WORKDIR, [state]);
-    }
+    await manager.postCleanup(cleanupMode, state);
   } catch (error) {
     await pgMediator?.updateAction({ status: ActionStatus.FAILED, metadata: { error } });
     throw error;
@@ -99,9 +90,7 @@ export const runCreatePipeline = async (
   try {
     const state = await manager.getState(stateSource);
 
-    if (cleanupMode === 'pre-clean-others') {
-      await emptyDirectory(WORKDIR, [state]);
-    }
+    await manager.preCleanup(cleanupMode, state);
 
     const pgDumpFilePath = await manager.createPgDump(outputFormat, shouldResume, pgMediator);
 
@@ -115,13 +104,7 @@ export const runCreatePipeline = async (
       await manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerHeaders }, { ...metadata, bucket: s3BucketName });
     }
 
-    if (cleanupMode === 'post-clean-workdir') {
-      await emptyDirectory(join(WORKDIR, state));
-    } else if (cleanupMode === 'post-clean-others') {
-      await emptyDirectory(WORKDIR, [state]);
-    } else if (cleanupMode === 'post-clean-all') {
-      await emptyDirectory(WORKDIR);
-    }
+    await manager.postCleanup(cleanupMode, state);
 
     await ngMediator?.updateAction({ status: ActionStatus.COMPLETED, metadata: { dumpServerPayload: { ...metadata, bucket: s3BucketName } } });
   } catch (error) {

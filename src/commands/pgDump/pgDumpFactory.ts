@@ -1,41 +1,44 @@
-import type { Argv, CommandModule, Arguments } from 'yargs';
+import type { CommandModule } from 'yargs';
 import type { Logger } from '@map-colonies/js-logger';
 import type { FactoryFunction } from 'tsyringe';
 import { container } from 'tsyringe';
 import { ExitCodes, EXIT_CODE, SERVICES } from '@common/constants';
 import { ErrorWithExitCode } from '@common/errors';
 import type { ArstotzkaConfig } from '@common/interfaces';
-import { check as checkWrapper } from '@src/wrappers/check';
+import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
-import type { GlobalArguments as PgDumpArguments } from '../common/types';
-import { PG_DUMP_CLEANUP_CHOICES } from '../common/types';
 import { stateSourceCheck } from '../common/checks';
-import { addCleanupModeOption, addOutputAndStateOptions } from '../common/optionsBuilder';
+import type { PgDumpPipelineArgs } from '../common/pipelineRunner';
 import { runPgDumpPipeline } from '../common/pipelineRunner';
 import type { PgDumpManager } from './pgDumpManager';
 import { PG_DUMP_MANAGER_FACTORY } from './pgDumpManagerFactory';
 
 export const PG_DUMP_COMMAND_FACTORY = Symbol('PgDumpCommandFactory');
 
-export const pgDumpCommandFactory: FactoryFunction<CommandModule<PgDumpArguments, PgDumpArguments>> = (dependencyContainer) => {
+export const pgDumpCommandFactory: FactoryFunction<CommandModule> = (dependencyContainer) => {
   const command = 'pg_dump';
 
   const describe = 'create a postgres dump from an existing osm database';
 
   const logger = dependencyContainer.resolve<Logger>(SERVICES.LOGGER);
 
-  const builder = (yargs: Argv<PgDumpArguments>): Argv<PgDumpArguments> => {
-    addCleanupModeOption(addOutputAndStateOptions(yargs), PG_DUMP_CLEANUP_CHOICES).check(checkWrapper(stateSourceCheck, logger));
-    return yargs;
-  };
+  const handler = async (): Promise<void> => {
+    logger.debug({ msg: 'starting command execution', command });
 
-  const handler = async (args: Arguments<PgDumpArguments>): Promise<void> => {
-    logger.debug({ msg: 'starting command execution', command, args });
-
+    const config = dependencyContainer.resolve<ConfigType>(SERVICES.CONFIG);
     const arstotzkaConfig = dependencyContainer.resolve<ArstotzkaConfig>(SERVICES.ARSTOTZKA);
     const manager = dependencyContainer.resolve<PgDumpManager>(PG_DUMP_MANAGER_FACTORY);
 
     try {
+      const stateSource = config.get('cli.stateSource');
+      stateSourceCheck(stateSource);
+
+      const args: PgDumpPipelineArgs = {
+        outputFormat: config.get('cli.outputFormat'),
+        stateSource,
+        cleanupMode: config.get('cli.cleanupMode'),
+      };
+
       await runPgDumpPipeline(manager, args, logger, arstotzkaConfig);
 
       logger.info({ msg: 'finished command execution successfully', command, args });
@@ -56,7 +59,6 @@ export const pgDumpCommandFactory: FactoryFunction<CommandModule<PgDumpArguments
   return {
     command,
     describe,
-    builder,
     handler,
   };
 };

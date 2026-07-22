@@ -1,137 +1,132 @@
-import type { Argv, CommandModule, Arguments } from 'yargs';
+import type { CommandModule } from 'yargs';
 import type { Logger } from '@map-colonies/js-logger';
 import type { FactoryFunction } from 'tsyringe';
 import { container } from 'tsyringe';
-import { S3Client } from '@aws-sdk/client-s3';
 import { schedule as cronSchedule } from 'node-cron';
-import { S3_REGION, SERVICES } from '@common/constants';
+import { ExitCodes, EXIT_CODE, SERVICES } from '@common/constants';
+import { ErrorWithExitCode, CheckError } from '@common/errors';
 import type { ArstotzkaConfig } from '@common/interfaces';
-import { check as checkWrapper } from '@src/wrappers/check';
+import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
-import type { GlobalArguments } from '../common/types';
-import { CREATE_CLEANUP_CHOICES } from '../common/types';
 import { stateSourceCheck } from '../common/checks';
-import type { CreateOnlyArguments } from '../common/optionsBuilder';
-import { addCleanupModeOption, addCreateOnlyOptions, addOutputAndStateOptions } from '../common/optionsBuilder';
-import type { CreatePipelineArgs } from '../common/pipelineRunner';
+import type { CreatePipelineArgs, PgDumpPipelineArgs } from '../common/pipelineRunner';
 import { runCreatePipeline, runPgDumpPipeline } from '../common/pipelineRunner';
-import { dumpServerUriCheck, httpHeadersCheck } from '../create/checks';
 import type { CreateManager } from '../create/createManager';
 import { CREATE_MANAGER_FACTORY } from '../create/createManagerFactory';
 import type { PgDumpManager } from '../pgDump/pgDumpManager';
 import { PG_DUMP_MANAGER_FACTORY } from '../pgDump/pgDumpManagerFactory';
-import { cronExpressionCheck, scheduleTargetOptionsCheck } from './checks';
+import { cronExpressionCheck } from './checks';
 
 export const SCHEDULE_COMMAND_FACTORY = Symbol('ScheduleCommandFactory');
 
-export type ScheduleTarget = 'create' | 'pg_dump';
-
-export interface ScheduleArguments extends GlobalArguments, CreateOnlyArguments {
-  target: ScheduleTarget;
-  cronExpression: string;
-  runOnInit: boolean;
-}
-
-export const scheduleCommandFactory: FactoryFunction<CommandModule<ScheduleArguments, ScheduleArguments>> = (dependencyContainer) => {
+export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependencyContainer) => {
   const command = 'schedule';
 
   const describe = 'run the create or pg_dump pipeline repeatedly on a cron schedule';
 
   const logger = dependencyContainer.resolve<Logger>(SERVICES.LOGGER);
 
-  const builder = (yargs: Argv<ScheduleArguments>): Argv<ScheduleArguments> => {
-    addCreateOnlyOptions(addCleanupModeOption(addOutputAndStateOptions(yargs), CREATE_CLEANUP_CHOICES))
-      .option('target', {
-        describe: 'which pipeline to run on each scheduled tick',
-        choices: ['create', 'pg_dump'] as ScheduleTarget[],
-        nargs: 1,
-        type: 'string',
-        demandOption: true,
-      })
-      .option('cronExpression', {
-        alias: ['cron-expression'],
-        describe: 'a cron expression controlling the schedule',
-        nargs: 1,
-        type: 'string',
-        demandOption: true,
-      })
-      .option('runOnInit', {
-        alias: ['run-on-init'],
-        describe: 'immediately run the pipeline once at startup, before waiting for the first scheduled tick',
-        type: 'boolean',
-        default: false,
-      })
-      .check(checkWrapper(stateSourceCheck, logger))
-      .check(checkWrapper(cronExpressionCheck, logger))
-      .check(checkWrapper(scheduleTargetOptionsCheck, logger))
-      .check(checkWrapper(dumpServerUriCheck, logger))
-      .check(checkWrapper(httpHeadersCheck, logger))
-      .middleware((argv) => {
-        if (argv.target === 'create') {
-          const { s3Endpoint } = argv;
-          const client = new S3Client({
-            endpoint: s3Endpoint,
-            region: S3_REGION,
-            forcePathStyle: true,
-          });
-          container.register(SERVICES.S3, { useValue: client });
-        }
-      });
-    return yargs;
-  };
+  const handler = async (): Promise<void> => {
+    logger.debug({ msg: 'starting command execution', command });
 
-  const handler = async (args: Arguments<ScheduleArguments>): Promise<void> => {
-    const { target, cronExpression, runOnInit } = args;
-
-    logger.debug({ msg: 'starting command execution', command, args });
-
+    const config = dependencyContainer.resolve<ConfigType>(SERVICES.CONFIG);
     const arstotzkaConfig = dependencyContainer.resolve<ArstotzkaConfig>(SERVICES.ARSTOTZKA);
 
-    const runOnce = async (): Promise<void> => {
-      try {
-        if (target === 'create') {
-          // s3Endpoint/s3BucketName are guaranteed defined here by scheduleTargetOptionsCheck
-          const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
-          await runCreatePipeline(manager, args as unknown as CreatePipelineArgs, logger, arstotzkaConfig);
-        } else {
-          const manager = dependencyContainer.resolve<PgDumpManager>(PG_DUMP_MANAGER_FACTORY);
-          await runPgDumpPipeline(manager, args, logger, arstotzkaConfig);
-        }
+    try {
+      const stateSource = config.get('cli.stateSource');
+      stateSourceCheck(stateSource);
 
-        logger.info({ msg: 'scheduled run finished successfully', command, target });
-      } catch (error) {
-        terminateChildren();
-        logger.error({ err: error, msg: 'scheduled run failed, will retry on next tick', command, target });
+      const target = config.get('cli.schedule.target');
+      if (target === undefined) {
+        throw new CheckError('cli.schedule.target must be configured to run the schedule command', 'cli.schedule.target', target);
       }
-    };
 
-    if (runOnInit) {
-      await runOnce();
-    }
+      const cronExpression = config.get('cli.schedule.cronExpression');
+      if (cronExpression === undefined) {
+        throw new CheckError(
+          'cli.schedule.cronExpression must be configured to run the schedule command',
+          'cli.schedule.cronExpression',
+          cronExpression
+        );
+      }
+      cronExpressionCheck(cronExpression);
 
-    const task = cronSchedule(cronExpression, runOnce, { noOverlap: true, name: 'planet-dumper-schedule' });
-    task.on('execution:overlap', () => {
-      logger.warn({ msg: 'skipped scheduled tick because the previous run is still in-flight', command, target });
-    });
+      const runOnInit = config.get('cli.schedule.runOnInit');
+      const outputFormat = config.get('cli.outputFormat');
+      const cleanupMode = config.get('cli.cleanupMode');
 
-    logger.info({ msg: 'scheduler armed, waiting for ticks', command, cronExpression, target });
+      const runOnce = async (): Promise<void> => {
+        try {
+          if (target === 'create') {
+            const s3BucketName = config.get('s3.bucketName');
+            if (s3BucketName === undefined) {
+              throw new CheckError('s3.bucketName must be configured when target is "create"', 's3.bucketName', s3BucketName);
+            }
 
-    await new Promise<void>((resolve) => {
-      const shutdown = (signal: string): void => {
-        logger.info({ msg: 'received shutdown signal, stopping scheduler', signal });
-        void Promise.resolve(task.stop()).finally(resolve);
+            const args: CreatePipelineArgs = {
+              outputFormat,
+              stateSource,
+              cleanupMode,
+              resume: config.get('cli.resume'),
+              info: config.get('cli.info'),
+              s3BucketName,
+              s3Acl: config.get('s3.acl'),
+              dumpServerEndpoint: config.get('cli.dumpServer.endpoint'),
+              dumpServerHeaders: config.get('cli.dumpServer.headers'),
+            };
+            const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
+            await runCreatePipeline(manager, args, logger, arstotzkaConfig);
+          } else {
+            const args: PgDumpPipelineArgs = { outputFormat, stateSource, cleanupMode };
+            const manager = dependencyContainer.resolve<PgDumpManager>(PG_DUMP_MANAGER_FACTORY);
+            await runPgDumpPipeline(manager, args, logger, arstotzkaConfig);
+          }
+
+          logger.info({ msg: 'scheduled run finished successfully', command, target });
+        } catch (error) {
+          terminateChildren();
+          logger.error({ err: error, msg: 'scheduled run failed, will retry on next tick', command, target });
+        }
       };
-      process.once('SIGTERM', () => shutdown('SIGTERM'));
-      process.once('SIGINT', () => shutdown('SIGINT'));
-    });
 
-    logger.info({ msg: 'schedule command shutting down', command });
+      if (runOnInit) {
+        await runOnce();
+      }
+
+      const task = cronSchedule(cronExpression, runOnce, { noOverlap: true, name: 'planet-dumper-schedule' });
+      task.on('execution:overlap', () => {
+        logger.warn({ msg: 'skipped scheduled tick because the previous run is still in-flight', command, target });
+      });
+
+      logger.info({ msg: 'scheduler armed, waiting for ticks', command, cronExpression, target });
+
+      await new Promise<void>((resolve) => {
+        const shutdown = (signal: string): void => {
+          logger.info({ msg: 'received shutdown signal, stopping scheduler', signal });
+          void Promise.resolve(task.stop()).finally(resolve);
+        };
+        process.once('SIGTERM', () => shutdown('SIGTERM'));
+        process.once('SIGINT', () => shutdown('SIGINT'));
+      });
+
+      logger.info({ msg: 'schedule command shutting down', command });
+    } catch (error) {
+      let exitCode = ExitCodes.GENERAL_ERROR;
+
+      if (error instanceof ErrorWithExitCode) {
+        exitCode = error.exitCode;
+      }
+
+      terminateChildren();
+
+      container.register(EXIT_CODE, { useValue: exitCode });
+      logger.error({ err: error, msg: 'an error occurred while executing command', command: command, exitCode });
+    }
   };
 
   return {
     command,
     describe,
-    builder,
     handler,
   };
 };
