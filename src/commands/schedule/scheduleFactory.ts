@@ -37,17 +37,12 @@ export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependenc
       stateSourceCheck(stateSource);
 
       const target = config.get('cli.schedule.target');
-      if (target === undefined) {
-        throw new CheckError('cli.schedule.target must be configured to run the schedule command', 'cli.schedule.target', target);
-      }
-
       const cronExpression = config.get('cli.schedule.cronExpression');
-      if (cronExpression === undefined) {
-        throw new CheckError(
-          'cli.schedule.cronExpression must be configured to run the schedule command',
-          'cli.schedule.cronExpression',
-          cronExpression
-        );
+      if (target === undefined || cronExpression === undefined) {
+        throw new CheckError('cli.schedule.target and cli.schedule.cronExpression must be configured to run the schedule command', 'cli.schedule', {
+          target,
+          cronExpression,
+        });
       }
       cronExpressionCheck(cronExpression);
 

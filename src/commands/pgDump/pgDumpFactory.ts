@@ -8,8 +8,7 @@ import type { ArstotzkaConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
 import { stateSourceCheck } from '../common/checks';
-import type { PgDumpPipelineArgs } from '../common/pipelineRunner';
-import { runPgDumpPipeline } from '../common/pipelineRunner';
+import { runPgDumpPipeline, type PgDumpPipelineArgs } from '../common/pipelineRunner';
 import type { PgDumpManager } from './pgDumpManager';
 import { PG_DUMP_MANAGER_FACTORY } from './pgDumpManagerFactory';
 

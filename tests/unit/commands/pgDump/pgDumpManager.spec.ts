@@ -230,8 +230,6 @@ describe('PgDumpManager', () => {
     });
 
     it('propagates a network failure when fetching remote state', async () => {
-      // nock's replyWithError never settles requests made with responseType: 'stream' (a known nock/axios
-      // interaction gap), so a real connection refusal against a closed local port is used instead.
       const manager = buildManager(undefined, axios.create());
 
       await expect(manager.getState('http://127.0.0.1:1/state.txt')).rejects.toThrow('ECONNREFUSED');

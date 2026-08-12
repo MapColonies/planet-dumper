@@ -40,8 +40,6 @@ describe('spawner', () => {
       });
 
       it('sends SIGINT to a running child and reports it as terminated', async () => {
-        // spawnChild's body runs synchronously up to its first await, so the child is already
-        // tracked by the time this line returns control to the test.
         const childPromise = spawnChild(NODE, ['-e', 'setInterval(() => {}, 1000)']);
 
         const result = terminateChildren();
@@ -82,10 +80,6 @@ describe('spawner', () => {
       await expect(spawnChild('this-executable-does-not-exist-xyz')).rejects.toMatchObject({ code: 'ENOENT' });
     });
 
-    // documenting current behavior, not the intended contract: commandWrapper (pgDumpManager.ts) awaits
-    // spawnChild expecting it to resolve with { exitCode } so it can map non-zero codes to a domain-specific
-    // error itself. execa's default `reject: true` means spawnChild actually rejects here instead, so that
-    // mapping in commandWrapper never runs in production - see the flagged mismatch from this session.
     it('rejects (rather than resolving with a non-zero exitCode) when the process exits with a non-zero code', async () => {
       await expect(spawnChild(NODE, ['-e', 'process.exit(3)'])).rejects.toMatchObject({ exitCode: 3 });
     });

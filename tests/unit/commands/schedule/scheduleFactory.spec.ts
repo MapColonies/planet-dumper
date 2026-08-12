@@ -73,7 +73,6 @@ const validConfig = (overrides: Record<string, unknown> = {}): ReturnType<typeof
     ...overrides,
   });
 
-// runs the handler until it logs that the scheduler has armed, then sends SIGTERM and waits for clean shutdown
 const runUntilArmedThenShutdown = async (handler: (args: { _: string[]; $0: string }) => Promise<void>, logger: Logger): Promise<void> => {
   const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
 
@@ -222,7 +221,6 @@ describe('scheduleCommandFactory', () => {
       expect(runCreatePipelineMock).not.toHaveBeenCalled();
       expect(terminateChildrenMock).toHaveBeenCalledOnce();
       expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ msg: 'scheduled run failed, will retry on next tick', target: 'create' }));
-      // the outer exit-code registration only fires for setup-time failures, not per-tick ones, so scheduling itself is unaffected
       expect(registerSpy).not.toHaveBeenCalledWith(EXIT_CODE, expect.anything());
     });
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { container } from 'tsyringe';
 import type { DependencyContainer } from 'tsyringe';
 import type { Logger } from '@map-colonies/js-logger';
@@ -77,7 +78,6 @@ describe('createCommandFactory', () => {
       const dependencyContainer = buildDependencyContainer({ config: validConfig(), logger });
       const { handler } = createCommandFactory(dependencyContainer);
 
-      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
       await handler({ _: [], $0: 'planet-dumper' });
 
       expect(runCreatePipelineMock).toHaveBeenCalledWith(
@@ -110,7 +110,6 @@ describe('createCommandFactory', () => {
       const dependencyContainer = buildDependencyContainer({ config });
       const { handler } = createCommandFactory(dependencyContainer);
 
-      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
       await handler({ _: [], $0: 'planet-dumper' });
 
       expect(runCreatePipelineMock).not.toHaveBeenCalled();
@@ -143,7 +142,6 @@ describe('createCommandFactory', () => {
       const dependencyContainer = buildDependencyContainer({ config: validConfig() });
       const { handler } = createCommandFactory(dependencyContainer);
 
-      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
       await handler({ _: [], $0: 'planet-dumper' });
 
       expect(terminateChildrenMock).toHaveBeenCalledOnce();

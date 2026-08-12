@@ -22,8 +22,6 @@ describe('schedule command - noOverlap', () => {
     const logger = await jsLogger({ enabled: false });
     const warnSpy = vi.spyOn(logger, 'warn');
 
-    // gate the first run on an explicit signal instead of a fixed delay, so "still in-flight"
-    // is guaranteed rather than timing-dependent on how fast the test happens to run.
     let releaseFirstRun: () => void = () => {};
     const firstRunGate = new Promise<void>((resolve) => {
       releaseFirstRun = resolve;
@@ -43,13 +41,8 @@ describe('schedule command - noOverlap', () => {
     childContainer.register(PG_DUMP_MANAGER_FACTORY, { useValue: manager });
 
     const { handler } = scheduleCommandFactory(childContainer);
-    // handler no longer reads argv (everything comes from config), but its type signature
-    // still requires an Arguments-shaped stub since it satisfies yargs' CommandModule
-    // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
     const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
 
-    // the cron ticks every second; wait long enough for at least two ticks to have landed
-    // while the first run is still blocked on firstRunGate
     await delay(2200);
 
     expect(createPgDump).toHaveBeenCalledTimes(1);

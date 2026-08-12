@@ -121,10 +121,6 @@ describe('S3ClientWrapper', () => {
     });
   });
 
-  // No Bad Path here: every failure this wrapper can hit is either a graceful "not found" (Happy Path
-  // above) or an unexpected AWS-side error wrapped as S3Error (Sad Path below) - there is no
-  // validation-style rejection of caller input to test separately.
-
   describe('Sad Path', () => {
     it('throws S3Error when getting an object fails for a reason other than not-found', async () => {
       const s3Client = buildS3Client();

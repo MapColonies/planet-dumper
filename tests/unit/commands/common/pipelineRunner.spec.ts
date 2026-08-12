@@ -46,70 +46,74 @@ describe('pipelineRunner', () => {
       ...overrides,
     });
 
-    it('resolves state and creates the pg dump without cleanup by default', async () => {
-      const { manager, fsRepository } = buildManager();
-      vi.spyOn(manager, 'getState').mockResolvedValue('1');
-      const createPgDump = vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
+    describe('Happy Path', () => {
+      it('resolves state and creates the pg dump without cleanup by default', async () => {
+        const { manager, fsRepository } = buildManager();
+        vi.spyOn(manager, 'getState').mockResolvedValue('1');
+        const createPgDump = vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
 
-      await runPgDumpPipeline(manager, buildArgs(), logger, disabledArstotzkaConfig);
+        await runPgDumpPipeline(manager, buildArgs(), logger, disabledArstotzkaConfig);
 
-      expect(createPgDump).toHaveBeenCalledWith('dump_{state}_{timestamp}.pbf', false, undefined);
-      expect(vi.mocked(fsRepository.emptyDirectory)).not.toHaveBeenCalled();
+        expect(createPgDump).toHaveBeenCalledWith('dump_{state}_{timestamp}.pbf', false, undefined);
+        expect(vi.mocked(fsRepository.emptyDirectory)).not.toHaveBeenCalled();
+      });
+
+      it('cleans up other states before creating the pg dump when cleanupMode is pre-clean-others', async () => {
+        const { manager, fsRepository } = buildManager();
+        vi.spyOn(manager, 'getState').mockResolvedValue('1');
+        const createPgDump = vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
+
+        await runPgDumpPipeline(manager, buildArgs({ cleanupMode: 'pre-clean-others' }), logger, disabledArstotzkaConfig);
+
+        expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR, ['1']);
+
+        const [emptyDirectoryOrder] = vi.mocked(fsRepository.emptyDirectory).mock.invocationCallOrder;
+        const [createPgDumpOrder] = createPgDump.mock.invocationCallOrder;
+        if (emptyDirectoryOrder === undefined || createPgDumpOrder === undefined) {
+          throw new Error('expected both emptyDirectory and createPgDump to have been called');
+        }
+        expect(emptyDirectoryOrder).toBeLessThan(createPgDumpOrder);
+      });
+
+      it('cleans up other states after creating the pg dump when cleanupMode is post-clean-others', async () => {
+        const { manager, fsRepository } = buildManager();
+        vi.spyOn(manager, 'getState').mockResolvedValue('1');
+        vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
+
+        await runPgDumpPipeline(manager, buildArgs({ cleanupMode: 'post-clean-others' }), logger, disabledArstotzkaConfig);
+
+        expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR, ['1']);
+      });
+
+      it('reserves access, creates the action, and reports completion via the mediator when arstotzka is enabled', async () => {
+        const { manager } = buildManager();
+        vi.spyOn(manager, 'getState').mockResolvedValue('1');
+        const createPgDump = vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
+
+        await runPgDumpPipeline(manager, buildArgs(), logger, enabledArstotzkaConfig);
+
+        expect(createPgDump).toHaveBeenCalledWith('dump_{state}_{timestamp}.pbf', false, expect.anything());
+      });
     });
 
-    it('cleans up other states before creating the pg dump when cleanupMode is pre-clean-others', async () => {
-      const { manager, fsRepository } = buildManager();
-      vi.spyOn(manager, 'getState').mockResolvedValue('1');
-      const createPgDump = vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
+    describe('Sad Path', () => {
+      it('propagates errors raised while creating the pg dump', async () => {
+        const { manager } = buildManager();
+        vi.spyOn(manager, 'getState').mockResolvedValue('1');
+        const failure = new Error('pg_dump failed');
+        vi.spyOn(manager, 'createPgDump').mockRejectedValue(failure);
 
-      await runPgDumpPipeline(manager, buildArgs({ cleanupMode: 'pre-clean-others' }), logger, disabledArstotzkaConfig);
+        await expect(runPgDumpPipeline(manager, buildArgs(), logger, disabledArstotzkaConfig)).rejects.toThrow(failure);
+      });
 
-      expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR, ['1']);
+      it('reports failure via the mediator when the pipeline throws and arstotzka is enabled', async () => {
+        const { manager } = buildManager();
+        vi.spyOn(manager, 'getState').mockResolvedValue('1');
+        const failure = new Error('pg_dump failed');
+        vi.spyOn(manager, 'createPgDump').mockRejectedValue(failure);
 
-      const [emptyDirectoryOrder] = vi.mocked(fsRepository.emptyDirectory).mock.invocationCallOrder;
-      const [createPgDumpOrder] = createPgDump.mock.invocationCallOrder;
-      if (emptyDirectoryOrder === undefined || createPgDumpOrder === undefined) {
-        throw new Error('expected both emptyDirectory and createPgDump to have been called');
-      }
-      expect(emptyDirectoryOrder).toBeLessThan(createPgDumpOrder);
-    });
-
-    it('cleans up other states after creating the pg dump when cleanupMode is post-clean-others', async () => {
-      const { manager, fsRepository } = buildManager();
-      vi.spyOn(manager, 'getState').mockResolvedValue('1');
-      vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
-
-      await runPgDumpPipeline(manager, buildArgs({ cleanupMode: 'post-clean-others' }), logger, disabledArstotzkaConfig);
-
-      expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR, ['1']);
-    });
-
-    it('propagates errors raised while creating the pg dump', async () => {
-      const { manager } = buildManager();
-      vi.spyOn(manager, 'getState').mockResolvedValue('1');
-      const failure = new Error('pg_dump failed');
-      vi.spyOn(manager, 'createPgDump').mockRejectedValue(failure);
-
-      await expect(runPgDumpPipeline(manager, buildArgs(), logger, disabledArstotzkaConfig)).rejects.toThrow(failure);
-    });
-
-    it('reserves access, creates the action, and reports completion via the mediator when arstotzka is enabled', async () => {
-      const { manager } = buildManager();
-      vi.spyOn(manager, 'getState').mockResolvedValue('1');
-      const createPgDump = vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
-
-      await runPgDumpPipeline(manager, buildArgs(), logger, enabledArstotzkaConfig);
-
-      expect(createPgDump).toHaveBeenCalledWith('dump_{state}_{timestamp}.pbf', false, expect.anything());
-    });
-
-    it('reports failure via the mediator when the pipeline throws and arstotzka is enabled', async () => {
-      const { manager } = buildManager();
-      vi.spyOn(manager, 'getState').mockResolvedValue('1');
-      const failure = new Error('pg_dump failed');
-      vi.spyOn(manager, 'createPgDump').mockRejectedValue(failure);
-
-      await expect(runPgDumpPipeline(manager, buildArgs(), logger, enabledArstotzkaConfig)).rejects.toThrow(failure);
+        await expect(runPgDumpPipeline(manager, buildArgs(), logger, enabledArstotzkaConfig)).rejects.toThrow(failure);
+      });
     });
   });
 
@@ -140,70 +144,74 @@ describe('pipelineRunner', () => {
       return { createNgDump, uploadDumpToS3, registerOnDumpServer };
     };
 
-    it('runs the full pipeline and skips dump-server registration when no endpoint is configured', async () => {
-      const { manager, fsRepository } = buildManager();
-      const { createNgDump, uploadDumpToS3, registerOnDumpServer } = stubHappyPath(manager);
+    describe('Happy Path', () => {
+      it('runs the full pipeline and skips dump-server registration when no endpoint is configured', async () => {
+        const { manager, fsRepository } = buildManager();
+        const { createNgDump, uploadDumpToS3, registerOnDumpServer } = stubHappyPath(manager);
 
-      await runCreatePipeline(manager, buildArgs(), logger, disabledArstotzkaConfig);
+        await runCreatePipeline(manager, buildArgs(), logger, disabledArstotzkaConfig);
 
-      expect(createNgDump).toHaveBeenCalledWith('dump_{state}_{timestamp}.pbf', '/workdir/1/pg_dump/dump.dmp', false, false, undefined);
-      expect(uploadDumpToS3).toHaveBeenCalledWith('/workdir/1/ng_dump/dump.pbf', 'bucket', expect.any(String), 'private');
-      expect(registerOnDumpServer).not.toHaveBeenCalled();
-      expect(vi.mocked(fsRepository.emptyDirectory)).not.toHaveBeenCalled();
+        expect(createNgDump).toHaveBeenCalledWith('dump_{state}_{timestamp}.pbf', '/workdir/1/pg_dump/dump.dmp', false, false, undefined);
+        expect(uploadDumpToS3).toHaveBeenCalledWith('/workdir/1/ng_dump/dump.pbf', 'bucket', expect.any(String), 'private');
+        expect(registerOnDumpServer).not.toHaveBeenCalled();
+        expect(vi.mocked(fsRepository.emptyDirectory)).not.toHaveBeenCalled();
+      });
+
+      it('registers the dump on the dump server when an endpoint is configured', async () => {
+        const { manager } = buildManager();
+        const { registerOnDumpServer } = stubHappyPath(manager);
+
+        await runCreatePipeline(
+          manager,
+          buildArgs({ dumpServerEndpoint: 'https://dump-server.example.com', dumpServerHeaders: ['X-API-KEY=secret'] }),
+          logger,
+          disabledArstotzkaConfig
+        );
+
+        expect(registerOnDumpServer).toHaveBeenCalledWith(
+          { dumpServerEndpoint: 'https://dump-server.example.com', dumpServerHeaders: ['X-API-KEY=secret'] },
+          expect.objectContaining({ bucket: 'bucket' })
+        );
+      });
+
+      it("empties only the current state's workdir when cleanupMode is post-clean-workdir", async () => {
+        const { manager, fsRepository } = buildManager();
+        stubHappyPath(manager);
+
+        await runCreatePipeline(manager, buildArgs({ cleanupMode: 'post-clean-workdir' }), logger, disabledArstotzkaConfig);
+
+        expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(join(WORKDIR, '1'));
+      });
+
+      it("empties other states' workdirs when cleanupMode is post-clean-others", async () => {
+        const { manager, fsRepository } = buildManager();
+        stubHappyPath(manager);
+
+        await runCreatePipeline(manager, buildArgs({ cleanupMode: 'post-clean-others' }), logger, disabledArstotzkaConfig);
+
+        expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR, ['1']);
+      });
+
+      it('empties the entire workdir when cleanupMode is post-clean-all', async () => {
+        const { manager, fsRepository } = buildManager();
+        stubHappyPath(manager);
+
+        await runCreatePipeline(manager, buildArgs({ cleanupMode: 'post-clean-all' }), logger, disabledArstotzkaConfig);
+
+        expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR);
+      });
     });
 
-    it('registers the dump on the dump server when an endpoint is configured', async () => {
-      const { manager } = buildManager();
-      const { registerOnDumpServer } = stubHappyPath(manager);
+    describe('Sad Path', () => {
+      it('propagates errors raised anywhere in the pipeline', async () => {
+        const { manager } = buildManager();
+        vi.spyOn(manager, 'getState').mockResolvedValue('1');
+        vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
+        const failure = new Error('ng dump failed');
+        vi.spyOn(manager, 'createNgDump').mockRejectedValue(failure);
 
-      await runCreatePipeline(
-        manager,
-        buildArgs({ dumpServerEndpoint: 'https://dump-server.example.com', dumpServerHeaders: ['X-API-KEY=secret'] }),
-        logger,
-        disabledArstotzkaConfig
-      );
-
-      expect(registerOnDumpServer).toHaveBeenCalledWith(
-        { dumpServerEndpoint: 'https://dump-server.example.com', dumpServerHeaders: ['X-API-KEY=secret'] },
-        expect.objectContaining({ bucket: 'bucket' })
-      );
-    });
-
-    it("empties only the current state's workdir when cleanupMode is post-clean-workdir", async () => {
-      const { manager, fsRepository } = buildManager();
-      stubHappyPath(manager);
-
-      await runCreatePipeline(manager, buildArgs({ cleanupMode: 'post-clean-workdir' }), logger, disabledArstotzkaConfig);
-
-      expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(join(WORKDIR, '1'));
-    });
-
-    it("empties other states' workdirs when cleanupMode is post-clean-others", async () => {
-      const { manager, fsRepository } = buildManager();
-      stubHappyPath(manager);
-
-      await runCreatePipeline(manager, buildArgs({ cleanupMode: 'post-clean-others' }), logger, disabledArstotzkaConfig);
-
-      expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR, ['1']);
-    });
-
-    it('empties the entire workdir when cleanupMode is post-clean-all', async () => {
-      const { manager, fsRepository } = buildManager();
-      stubHappyPath(manager);
-
-      await runCreatePipeline(manager, buildArgs({ cleanupMode: 'post-clean-all' }), logger, disabledArstotzkaConfig);
-
-      expect(vi.mocked(fsRepository.emptyDirectory)).toHaveBeenCalledWith(WORKDIR);
-    });
-
-    it('propagates errors raised anywhere in the pipeline', async () => {
-      const { manager } = buildManager();
-      vi.spyOn(manager, 'getState').mockResolvedValue('1');
-      vi.spyOn(manager, 'createPgDump').mockResolvedValue('/workdir/1/pg_dump/dump.dmp');
-      const failure = new Error('ng dump failed');
-      vi.spyOn(manager, 'createNgDump').mockRejectedValue(failure);
-
-      await expect(runCreatePipeline(manager, buildArgs(), logger, disabledArstotzkaConfig)).rejects.toThrow(failure);
+        await expect(runCreatePipeline(manager, buildArgs(), logger, disabledArstotzkaConfig)).rejects.toThrow(failure);
+      });
     });
   });
 });
