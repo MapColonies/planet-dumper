@@ -90,4 +90,19 @@ describe('FsRepository', () => {
       await expect(fsRepository.getFileSize(filePath)).resolves.toBe(5);
     });
   });
+
+  describe('#createFileReadStream', () => {
+    it('streams the full content of the given file', async () => {
+      const filePath = join(workdir, 'streamed.txt');
+      await writeFile(filePath, 'hello stream');
+
+      const stream = fsRepository.createFileReadStream(filePath);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(chunk as Buffer);
+      }
+
+      expect(Buffer.concat(chunks).toString()).toBe('hello stream');
+    });
+  });
 });

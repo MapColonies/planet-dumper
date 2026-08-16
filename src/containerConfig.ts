@@ -17,6 +17,7 @@ import { createManagerFactory, CREATE_MANAGER_FACTORY } from './commands/create/
 import { pgDumpCommandFactory, PG_DUMP_COMMAND_FACTORY } from './commands/pgDump/pgDumpFactory';
 import { pgDumpManagerFactory, PG_DUMP_MANAGER_FACTORY } from './commands/pgDump/pgDumpManagerFactory';
 import { scheduleCommandFactory, SCHEDULE_COMMAND_FACTORY } from './commands/schedule/scheduleFactory';
+import { CheckError } from './common/errors';
 
 export interface RegisterOptions {
   override?: InjectionObject<unknown>[];
@@ -90,19 +91,19 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
           useValue: cleanupRegistry.trigger.bind(cleanupRegistry),
         },
       },
-      ...(getConfig().get('s3.endpoint') !== undefined
-        ? [
-            {
-              token: SERVICES.S3,
-              provider: {
-                useFactory: instancePerContainerCachingFactory((container: DependencyContainer): S3Client => {
-                  const config = container.resolve<ConfigType>(SERVICES.CONFIG);
-                  return new S3Client({ endpoint: config.get('s3.endpoint'), region: S3_REGION, forcePathStyle: true });
-                }),
-              },
-            },
-          ]
-        : []),
+      {
+        token: SERVICES.S3,
+        provider: {
+          useFactory: instancePerContainerCachingFactory((container: DependencyContainer): S3Client => {
+            const config = container.resolve<ConfigType>(SERVICES.CONFIG);
+            const endpoint = config.get('s3.endpoint');
+            if (endpoint === undefined) {
+              throw new CheckError('s3.endpoint must be configured to use the s3 client', 's3', { endpoint });
+            }
+            return new S3Client({ endpoint, region: S3_REGION, forcePathStyle: true });
+          }),
+        },
+      },
     ];
 
     const container = await registerDependencies(dependencies, options?.override, options?.useChild);

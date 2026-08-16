@@ -3,13 +3,13 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import nock from 'nock';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { CreateManager } from '@src/commands/create/createManager';
+import type { S3Uploader } from '@src/commands/create/createManager';
 import { nameFormat } from '@src/commands/common/helpers';
 import { BucketDoesNotExistError, HttpUpstreamResponseError, ObjectKeyAlreadyExistError, OsmiumError, PlanetDumpNgError } from '@common/errors';
 import { WORKDIR, NG_DUMP_DIR } from '@common/constants';
 import { spawnChild } from '@common/spawner';
-import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
-import { S3ClientWrapper } from '@src/s3client/s3Client';
 import { buildConfig, buildFsRepository } from '@tests/fixtures';
 import type { FsRepository } from '@src/fsRepository/fsRepository';
 
@@ -19,34 +19,18 @@ vi.mock('@common/spawner', () => ({
   spawnChild: vi.fn(),
 }));
 
-vi.mock('node:fs', () => ({
-  createReadStream: vi.fn().mockReturnValue({}),
-}));
-
-vi.mock('@map-colonies/arstotzka-mediator', () => {
-  class StatefulMediator {
-    public reserveAccess = vi.fn().mockResolvedValue(undefined);
-    public removeLock = vi.fn().mockResolvedValue(undefined);
-    public createAction = vi.fn().mockResolvedValue({ actionId: 'action-1' });
-    public updateAction = vi.fn().mockResolvedValue(undefined);
-  }
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  return { StatefulMediator };
-});
-
 const spawnChildMock = vi.mocked(spawnChild);
 
 const buildAxios = (): AxiosInstance => axios.create();
 
-const buildS3Client = (): S3ClientWrapper =>
-  ({
-    validateExistance: vi.fn(),
-    uploadStreamInParallel: vi.fn().mockResolvedValue(undefined),
-  }) as unknown as S3ClientWrapper;
+const buildS3Client = (): S3Uploader => ({
+  validateExistance: vi.fn(),
+  uploadStreamInParallel: vi.fn().mockResolvedValue(undefined),
+});
 
 const buildManager = (
   fsRepository: FsRepository = buildFsRepository(),
-  s3Client: S3ClientWrapper = buildS3Client(),
+  s3Client: S3Uploader = buildS3Client(),
   config = buildConfig()
 ): CreateManager =>
   new CreateManager(

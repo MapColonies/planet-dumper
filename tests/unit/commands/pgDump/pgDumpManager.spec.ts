@@ -3,12 +3,12 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import nock from 'nock';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { PgDumpManager } from '@src/commands/pgDump/pgDumpManager';
 import { nameFormat } from '@src/commands/common/helpers';
 import { PgDumpError, InvalidStateFileError } from '@common/errors';
 import { WORKDIR, PG_DUMP_DIR } from '@common/constants';
 import { spawnChild } from '@common/spawner';
-import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { buildConfig, buildFsRepository } from '@tests/fixtures';
 import type { FsRepository } from '@src/fsRepository/fsRepository';
 
@@ -18,20 +18,13 @@ vi.mock('@common/spawner', () => ({
   spawnChild: vi.fn(),
 }));
 
-vi.mock('@map-colonies/arstotzka-mediator', () => {
-  class StatefulMediator {
-    public reserveAccess = vi.fn().mockResolvedValue(undefined);
-    public removeLock = vi.fn().mockResolvedValue(undefined);
-    public createAction = vi.fn().mockResolvedValue({ actionId: 'action-1' });
-    public updateAction = vi.fn().mockResolvedValue(undefined);
-  }
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  return { StatefulMediator };
-});
-
 const spawnChildMock = vi.mocked(spawnChild);
 
-const buildAxios = (): AxiosInstance => ({ get: vi.fn() }) as unknown as AxiosInstance;
+const buildAxios = (): AxiosInstance => {
+  const instance = axios.create();
+  vi.spyOn(instance, 'get');
+  return instance;
+};
 
 const buildManager = (fsRepository: FsRepository = buildFsRepository(), httpClient: AxiosInstance = buildAxios()) =>
   new PgDumpManager(

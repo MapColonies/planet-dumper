@@ -11,7 +11,6 @@ import { buildConfig, buildFsRepository, delay, disabledArstotzkaConfig } from '
 
 describe('schedule command - noOverlap', () => {
   afterEach(() => {
-    // clean up any task left registered in node-cron's global registry so it doesn't leak into other tests.
     getTasks().forEach((task) => {
       void task.destroy();
     });

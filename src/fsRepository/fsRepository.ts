@@ -1,4 +1,5 @@
-import { existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import type { ReadStream } from 'node:fs';
 import { mkdir, readdir, stat, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { injectable } from 'tsyringe';
@@ -46,5 +47,9 @@ export class FsRepository {
   public async getFileSize(this: void, path: string): Promise<number> {
     const stats = await stat(path);
     return stats.size;
+  }
+
+  public createFileReadStream(this: void, path: string): ReadStream {
+    return createReadStream(path);
   }
 }

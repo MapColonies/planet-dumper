@@ -8,8 +8,7 @@ import type { ArstotzkaConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
 import { stateSourceCheck } from '../common/checks';
-import type { CreatePipelineArgs } from '../common/pipelineRunner';
-import { runCreatePipeline } from '../common/pipelineRunner';
+import { runCreatePipeline, type CreatePipelineArgs } from '../common/pipelineRunner';
 import type { CreateManager } from './createManager';
 import { CREATE_MANAGER_FACTORY } from './createManagerFactory';
 
@@ -34,7 +33,7 @@ export const createCommandFactory: FactoryFunction<CommandModule> = (dependencyC
 
       const s3Endpoint = config.get('s3.endpoint');
       const s3BucketName = config.get('s3.bucketName');
-      if (s3Endpoint === undefined || s3BucketName === undefined) {
+      if (s3BucketName === undefined) {
         throw new CheckError('s3.endpoint and s3.bucketName must be configured to run the create command', 's3', { s3Endpoint, s3BucketName });
       }
 

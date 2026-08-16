@@ -12,17 +12,6 @@ import type { FsRepository } from '@src/fsRepository/fsRepository';
 import { WORKDIR } from '@common/constants';
 import { buildConfig, buildFsRepository, disabledArstotzkaConfig, enabledArstotzkaConfig } from '@tests/fixtures';
 
-vi.mock('@map-colonies/arstotzka-mediator', () => {
-  class StatefulMediator {
-    public reserveAccess = vi.fn().mockResolvedValue(undefined);
-    public removeLock = vi.fn().mockResolvedValue(undefined);
-    public createAction = vi.fn().mockResolvedValue({ actionId: 'action-1' });
-    public updateAction = vi.fn().mockResolvedValue(undefined);
-  }
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  return { StatefulMediator };
-});
-
 describe('pipelineRunner', () => {
   let logger: Awaited<ReturnType<typeof jsLogger>>;
 
