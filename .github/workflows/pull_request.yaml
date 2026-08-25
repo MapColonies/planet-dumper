@@ -45,7 +45,6 @@ jobs:
       - name: Helm Lint Checks
         uses: MapColonies/shared-workflows/actions/helm-lint@helm-lint-v1
 
-  # security scanning on PRs is handled by the separate snyk.yml workflow
 
   tests:
     name: Run Tests

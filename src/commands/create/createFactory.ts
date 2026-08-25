@@ -31,10 +31,9 @@ export const createCommandFactory: FactoryFunction<CommandModule> = (dependencyC
       const stateSource = config.get('cli.stateSource');
       stateSourceCheck(stateSource);
 
-      const s3Endpoint = config.get('s3.endpoint');
       const s3BucketName = config.get('s3.bucketName');
       if (s3BucketName === undefined) {
-        throw new CheckError('s3.endpoint and s3.bucketName must be configured to run the create command', 's3', { s3Endpoint, s3BucketName });
+        throw new CheckError('s3.endpoint and s3.bucketName must be configured to run the create command', 's3', { s3BucketName });
       }
 
       const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);

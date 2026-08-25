@@ -28,14 +28,11 @@ job:
   ttlSecondsAfterFinished: 60
   backoffLimit: 6
 
-# deploys an always-running Deployment (a single pod) which schedules the dump
-# pipeline itself, in-process, via node-cron - replaces the old k8s CronJob model.
-# only one of 'job'/'cron' can be enabled at the same time.
 cron:
   enabled: false
-  schedule: '* * * * *'
+  schedule: '0 0 * * 0'
   target: 'create' # which pipeline to run on each tick: 'create' | 'pg_dump'
-  runOnInit: false # run once immediately on pod startup/restart, in addition to the schedule
+  runOnInit: false 
 
 resources:
   enabled: false

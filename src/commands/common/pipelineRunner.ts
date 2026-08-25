@@ -16,6 +16,7 @@ const buildMediatorConfig = (mediator: Extract<ArstotzkaConfig, { enabled: true 
 
 const buildMediators = (arstotzkaConfig: ArstotzkaConfig, logger: Logger): { pgMediator?: StatefulMediator; ngMediator?: StatefulMediator } => {
   if (!arstotzkaConfig.enabled) {
+    logger.warn({ msg: 'Arstotzka is disabled, no mediators will be created' });
     return {};
   }
   const mediatorConfig = buildMediatorConfig(arstotzkaConfig.mediator);
