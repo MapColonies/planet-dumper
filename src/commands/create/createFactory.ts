@@ -9,8 +9,7 @@ import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
 import { stateSourceCheck } from '../common/checks';
 import { runCreatePipeline, type CreatePipelineArgs } from '../common/pipelineRunner';
-import type { CreateManager } from './createManager';
-import { CREATE_MANAGER_FACTORY } from './createManagerFactory';
+import { CreateManager } from './createManager';
 
 export const CREATE_COMMAND_FACTORY = Symbol('CreateCommandFactory');
 
@@ -32,26 +31,29 @@ export const createCommandFactory: FactoryFunction<CommandModule> = (dependencyC
       stateSourceCheck(stateSource);
 
       const s3BucketName = config.get('s3.bucketName');
-      if (s3BucketName === undefined) {
-        throw new CheckError('s3.endpoint and s3.bucketName must be configured to run the create command', 's3', { s3BucketName });
+      const s3Endpoint = config.get('s3.endpoint');
+      if (s3BucketName === undefined || s3BucketName === '' || s3Endpoint === undefined || s3Endpoint === '') {
+        throw new CheckError('s3.endpoint and s3.bucketName must be configured to run the create command', 's3', { s3BucketName, s3Endpoint });
       }
 
-      const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
+      const manager = dependencyContainer.resolve(CreateManager);
+
+      const { outputFormat, cleanupMode, resume, info, dumpServer } = config.get('cli');
 
       const args: CreatePipelineArgs = {
-        outputFormat: config.get('cli.outputFormat'),
+        outputFormat,
         stateSource,
-        cleanupMode: config.get('cli.cleanupMode'),
-        resume: config.get('cli.resume'),
-        info: config.get('cli.info'),
+        cleanupMode,
+        resume,
+        info,
         s3BucketName,
         s3Acl: config.get('s3.acl'),
-        dumpServerEndpoint: config.get('cli.dumpServer.endpoint'),
-        dumpServerHeaders: config.get('cli.dumpServer.headers'),
+        dumpServerEndpoint: dumpServer.endpoint,
+        dumpServerHeaders: dumpServer.headers,
       };
 
+      logger.debug({ msg: 'running create pipeline', args });
       await runCreatePipeline(manager, args, logger, arstotzkaConfig);
-
       logger.info({ msg: 'finished command execution successfully', command, args });
     } catch (error) {
       let exitCode = ExitCodes.GENERAL_ERROR;

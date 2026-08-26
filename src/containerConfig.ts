@@ -13,7 +13,6 @@ import type { InjectionObject } from '@common/dependencyRegistration';
 import { registerDependencies } from '@common/dependencyRegistration';
 import { cliBuilderFactory } from './cliBuilderFactory';
 import { createCommandFactory, CREATE_COMMAND_FACTORY } from './commands/create/createFactory';
-import { createManagerFactory, CREATE_MANAGER_FACTORY } from './commands/create/createManagerFactory';
 import { pgDumpCommandFactory, PG_DUMP_COMMAND_FACTORY } from './commands/pgDump/pgDumpFactory';
 import { pgDumpManagerFactory, PG_DUMP_MANAGER_FACTORY } from './commands/pgDump/pgDumpManagerFactory';
 import { scheduleCommandFactory, SCHEDULE_COMMAND_FACTORY } from './commands/schedule/scheduleFactory';
@@ -33,7 +32,6 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
       { token: PG_DUMP_COMMAND_FACTORY, provider: { useFactory: pgDumpCommandFactory } },
       { token: CREATE_COMMAND_FACTORY, provider: { useFactory: createCommandFactory } },
       { token: PG_DUMP_MANAGER_FACTORY, provider: { useFactory: pgDumpManagerFactory } },
-      { token: CREATE_MANAGER_FACTORY, provider: { useFactory: createManagerFactory } },
       { token: SCHEDULE_COMMAND_FACTORY, provider: { useFactory: scheduleCommandFactory } },
       { token: SERVICES.CONFIG, provider: { useFactory: () => getConfig() } },
       {

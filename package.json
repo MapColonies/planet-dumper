@@ -45,7 +45,7 @@
     "@map-colonies/config": "^4.0.1",
     "@map-colonies/js-logger": "^5.0.0",
     "@map-colonies/read-pkg": "^2.0.0",
-    "@map-colonies/schemas": "https://ghatmpstorage.blob.core.windows.net/npm-packages/schemas-120a0c5e573e9bc4c79b7e346950f4eb5835add9.tgz",
+    "@map-colonies/schemas": "https://ghatmpstorage.blob.core.windows.net/npm-packages/schemas-d7c4e3c8ee3d94e9a8cc383b0964618f3f1d740c.tgz",
     "@map-colonies/tracing": "^1.0.0",
     "@map-colonies/tracing-utils": "^1.0.0",
     "@opentelemetry/api": "^1.9.1",

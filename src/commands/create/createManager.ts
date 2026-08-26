@@ -5,7 +5,7 @@ import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import type { AxiosInstance } from 'axios';
 import { NG_DUMP_DIR, SERVICES, WORKDIR } from '@common/constants';
 import { DumpServerClient } from '@src/httpClient/dumpClient';
-import type { S3ClientWrapper } from '@src/s3client/s3Client';
+import { S3ClientWrapper } from '@src/s3client/s3Client';
 import { FsRepository } from '@src/fsRepository/fsRepository';
 import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, OsmiumError, PlanetDumpNgError } from '@common/errors';
 import type { DumpMetadata, DumpServerConfig } from '@common/interfaces';
@@ -27,7 +27,7 @@ export class CreateManager extends PgDumpManager {
     @inject(SERVICES.CONFIG) config: ConfigType,
     @inject(SERVICES.HTTP_CLIENT) axios: AxiosInstance,
     fsRepository: FsRepository,
-    private readonly s3Client: S3Uploader
+    @inject(S3ClientWrapper) private readonly s3Client: S3Uploader
   ) {
     super(logger, config, axios, fsRepository);
   }

@@ -11,8 +11,7 @@ import { terminateChildren } from '@common/spawner';
 import { stateSourceCheck } from '../common/checks';
 import type { CreatePipelineArgs, PgDumpPipelineArgs } from '../common/pipelineRunner';
 import { runCreatePipeline, runPgDumpPipeline } from '../common/pipelineRunner';
-import type { CreateManager } from '../create/createManager';
-import { CREATE_MANAGER_FACTORY } from '../create/createManagerFactory';
+import { CreateManager } from '../create/createManager';
 import type { PgDumpManager } from '../pgDump/pgDumpManager';
 import { PG_DUMP_MANAGER_FACTORY } from '../pgDump/pgDumpManagerFactory';
 import { cronExpressionCheck } from './checks';
@@ -69,7 +68,7 @@ export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependenc
               dumpServerEndpoint: config.get('cli.dumpServer.endpoint'),
               dumpServerHeaders: config.get('cli.dumpServer.headers'),
             };
-            const manager = dependencyContainer.resolve<CreateManager>(CREATE_MANAGER_FACTORY);
+            const manager = dependencyContainer.resolve(CreateManager);
             await runCreatePipeline(manager, args, logger, arstotzkaConfig);
           } else {
             const args: PgDumpPipelineArgs = { outputFormat, stateSource, cleanupMode };

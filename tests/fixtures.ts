@@ -10,6 +10,37 @@ import type { ArstotzkaConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { S3_REGION } from '@common/constants';
 
+// reconstructs a nested object from the flat dotted keys under `prefix` (e.g. prefix 'cli' picks up
+// 'cli.stateSource', 'cli.dumpServer.endpoint', etc.), mirroring how the real config lib resolves a
+// parent path - so `config.get('cli')` behaves the same as `config.get('cli.stateSource')` does
+const getNestedValue = (values: Record<string, unknown>, prefix: string): Record<string, unknown> | undefined => {
+  const dottedPrefix = `${prefix}.`;
+  const nested: Record<string, unknown> = {};
+  let matched = false;
+
+  for (const [key, value] of Object.entries(values)) {
+    if (!key.startsWith(dottedPrefix)) {
+      continue;
+    }
+    matched = true;
+
+    const parts = key.slice(dottedPrefix.length).split('.');
+    const leafKey = parts.pop();
+    if (leafKey === undefined) {
+      continue;
+    }
+
+    let cursor = nested;
+    for (const part of parts) {
+      cursor[part] = typeof cursor[part] === 'object' && cursor[part] !== null ? cursor[part] : {};
+      cursor = cursor[part] as Record<string, unknown>;
+    }
+    cursor[leafKey] = value;
+  }
+
+  return matched ? nested : undefined;
+};
+
 export const delay = async (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // unlisted paths (e.g. 'pgDump', 'postgres', read internally by PgDumpManager's constructor)
@@ -33,7 +64,7 @@ export const buildConfig = (overrides: Record<string, unknown> = {}): ConfigType
   };
 
   return {
-    get: vi.fn((path: string) => (path in values ? values[path] : {})) as ConfigType['get'],
+    get: vi.fn((path: string) => (path in values ? values[path] : (getNestedValue(values, path) ?? {}))) as ConfigType['get'],
     getAll: vi.fn(),
     getConfigParts: vi.fn(),
     getResolvedOptions: vi.fn(),

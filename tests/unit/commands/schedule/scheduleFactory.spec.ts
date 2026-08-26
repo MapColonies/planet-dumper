@@ -4,7 +4,6 @@ import type { Logger } from '@map-colonies/js-logger';
 import { getTasks } from 'node-cron';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { scheduleCommandFactory } from '@src/commands/schedule/scheduleFactory';
-import { CREATE_MANAGER_FACTORY } from '@src/commands/create/createManagerFactory';
 import { PG_DUMP_MANAGER_FACTORY } from '@src/commands/pgDump/pgDumpManagerFactory';
 import { runCreatePipeline, runPgDumpPipeline } from '@src/commands/common/pipelineRunner';
 import { terminateChildren } from '@common/spawner';
@@ -44,7 +43,7 @@ const buildDependencyContainer = async (overrides: {
   dependencyContainer.register(SERVICES.LOGGER, { useValue: logger });
   dependencyContainer.register(SERVICES.CONFIG, { useValue: config });
   dependencyContainer.register(SERVICES.ARSTOTZKA, { useValue: disabledArstotzkaConfig });
-  dependencyContainer.register(CREATE_MANAGER_FACTORY, { useValue: createManager });
+  dependencyContainer.register(CreateManager, { useValue: createManager });
   dependencyContainer.register(PG_DUMP_MANAGER_FACTORY, { useValue: pgDumpManager });
 
   return dependencyContainer;
