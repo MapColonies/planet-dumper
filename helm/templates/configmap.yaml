@@ -52,6 +52,6 @@ data:
   {{- if .Values.cron.enabled }}
   TARGET: {{ .Values.cron.target | quote }}
   CRON_EXPRESSION: {{ .Values.cron.schedule | quote }}
-  RUN_ON_INIT: {{ .Values.cron.runOnInit | quote }}
+  HTTP_SERVER_PORT: {{ .Values.server.port | quote }}
   {{- end }}
 {{- end -}}

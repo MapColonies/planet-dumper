@@ -24,13 +24,5 @@ export const registerDependencies = async (
     await injectionObj.postInjectionHook?.(container);
   }
 
-  for (const injectionObj of override ?? []) {
-    const isSubstituted = dependencies.some((dep) => dep.token === injectionObj.token);
-    if (!isSubstituted) {
-      container.register(injectionObj.token, injectionObj.provider as constructor<unknown>, injectionObj.options);
-      await injectionObj.postInjectionHook?.(container);
-    }
-  }
-
   return container;
 };

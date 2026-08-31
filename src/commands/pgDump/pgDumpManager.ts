@@ -27,7 +27,7 @@ export class PgDumpManager {
     @inject(SERVICES.LOGGER) public readonly logger: Logger,
     @inject(SERVICES.CONFIG) public readonly config: ConfigType,
     @inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance,
-    protected readonly fsRepository: FsRepository
+    @inject(FsRepository) protected readonly fsRepository: FsRepository
   ) {
     this.processConfig(config);
   }
@@ -94,15 +94,26 @@ export class PgDumpManager {
   }
 
   public async preCleanup(mode: CleanupMode, state: string): Promise<void> {
-    if (mode === 'pre-clean-others') {
-      await this.fsRepository.emptyDirectory(WORKDIR, [state]);
-    }
+    const preCleanupActions: Record<CleanupMode, () => Promise<void>> = {
+      'pre-clean-others': async () => this.fsRepository.emptyDirectory(WORKDIR, [state]),
+      none: async () => {},
+      'post-clean-workdir': async () => {},
+      'post-clean-others': async () => {},
+      'post-clean-all': async () => {},
+    };
+
+    await preCleanupActions[mode]();
   }
 
   public async postCleanup(mode: CleanupMode, state: string): Promise<void> {
-    if (mode === 'post-clean-others') {
-      await this.fsRepository.emptyDirectory(WORKDIR, [state]);
-    }
+    const postCleanupActions: Record<CleanupMode, () => Promise<void>> = {
+      'post-clean-others': async () => this.fsRepository.emptyDirectory(WORKDIR, [state]),
+      none: async () => {},
+      'post-clean-workdir': async () => {},
+      'pre-clean-others': async () => {},
+      'post-clean-all': async () => {},
+    };
+    await postCleanupActions[mode]();
   }
 
   public async commandWrapper(

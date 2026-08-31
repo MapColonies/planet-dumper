@@ -59,7 +59,6 @@ export const buildConfig = (overrides: Record<string, unknown> = {}): ConfigType
     'cli.dumpServer.headers': [],
     'cli.schedule.target': 'pg_dump',
     'cli.schedule.cronExpression': '* * * * * *',
-    'cli.schedule.runOnInit': false,
     ...overrides,
   };
 

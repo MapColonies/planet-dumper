@@ -9,8 +9,7 @@ import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
 import { stateSourceCheck } from '../common/checks';
 import { runPgDumpPipeline, type PgDumpPipelineArgs } from '../common/pipelineRunner';
-import type { PgDumpManager } from './pgDumpManager';
-import { PG_DUMP_MANAGER_FACTORY } from './pgDumpManagerFactory';
+import { PgDumpManager } from './pgDumpManager';
 
 export const PG_DUMP_COMMAND_FACTORY = Symbol('PgDumpCommandFactory');
 
@@ -26,7 +25,7 @@ export const pgDumpCommandFactory: FactoryFunction<CommandModule> = (dependencyC
 
     const config = dependencyContainer.resolve<ConfigType>(SERVICES.CONFIG);
     const arstotzkaConfig = dependencyContainer.resolve<ArstotzkaConfig>(SERVICES.ARSTOTZKA);
-    const manager = dependencyContainer.resolve<PgDumpManager>(PG_DUMP_MANAGER_FACTORY);
+    const manager = dependencyContainer.resolve(PgDumpManager);
 
     try {
       const stateSource = config.get('cli.stateSource');

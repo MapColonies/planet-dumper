@@ -50,6 +50,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - schedule
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.port }}
           envFrom:
             - configMapRef:
                 name: {{ $releaseName }}-{{ $chartName }}-configmap

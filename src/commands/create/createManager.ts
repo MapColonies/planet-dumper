@@ -26,7 +26,7 @@ export class CreateManager extends PgDumpManager {
     @inject(SERVICES.LOGGER) logger: Logger,
     @inject(SERVICES.CONFIG) config: ConfigType,
     @inject(SERVICES.HTTP_CLIENT) axios: AxiosInstance,
-    fsRepository: FsRepository,
+    @inject(FsRepository) fsRepository: FsRepository,
     @inject(S3ClientWrapper) private readonly s3Client: S3Uploader
   ) {
     super(logger, config, axios, fsRepository);
@@ -125,20 +125,15 @@ export class CreateManager extends PgDumpManager {
   }
 
   public override async postCleanup(mode: CleanupMode, state: string): Promise<void> {
-    switch (mode) {
-      case 'post-clean-workdir':
-        await this.fsRepository.emptyDirectory(join(WORKDIR, state));
-        break;
-      case 'post-clean-others':
-        await this.fsRepository.emptyDirectory(WORKDIR, [state]);
-        break;
-      case 'post-clean-all':
-        await this.fsRepository.emptyDirectory(WORKDIR);
-        break;
-      case 'none':
-      case 'pre-clean-others':
-        break;
-    }
+    const postCleanupActions: Record<CleanupMode, () => Promise<void>> = {
+      'post-clean-workdir': async () => this.fsRepository.emptyDirectory(join(WORKDIR, state)),
+      'post-clean-others': async () => this.fsRepository.emptyDirectory(WORKDIR, [state]),
+      'post-clean-all': async () => this.fsRepository.emptyDirectory(WORKDIR),
+      none: async () => {},
+      'pre-clean-others': async () => {},
+    };
+
+    await postCleanupActions[mode]();
   }
 
   protected override processConfig(config: ConfigType): void {

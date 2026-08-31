@@ -3,11 +3,11 @@ import type { Logger } from '@map-colonies/js-logger';
 import type { FactoryFunction } from 'tsyringe';
 import { container } from 'tsyringe';
 import { ExitCodes, EXIT_CODE, SERVICES } from '@common/constants';
-import { ErrorWithExitCode, CheckError } from '@common/errors';
+import { ErrorWithExitCode } from '@common/errors';
 import type { ArstotzkaConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
-import { stateSourceCheck } from '../common/checks';
+import { s3ConfigCheck, stateSourceCheck } from '../common/checks';
 import { runCreatePipeline, type CreatePipelineArgs } from '../common/pipelineRunner';
 import { CreateManager } from './createManager';
 
@@ -30,11 +30,8 @@ export const createCommandFactory: FactoryFunction<CommandModule> = (dependencyC
       const stateSource = config.get('cli.stateSource');
       stateSourceCheck(stateSource);
 
-      const s3BucketName = config.get('s3.bucketName');
-      const s3Endpoint = config.get('s3.endpoint');
-      if (s3BucketName === undefined || s3BucketName === '' || s3Endpoint === undefined || s3Endpoint === '') {
-        throw new CheckError('s3.endpoint and s3.bucketName must be configured to run the create command', 's3', { s3BucketName, s3Endpoint });
-      }
+      const s3Config = config.get('s3');
+      s3ConfigCheck(s3Config);
 
       const manager = dependencyContainer.resolve(CreateManager);
 
@@ -46,8 +43,8 @@ export const createCommandFactory: FactoryFunction<CommandModule> = (dependencyC
         cleanupMode,
         resume,
         info,
-        s3BucketName,
-        s3Acl: config.get('s3.acl'),
+        s3BucketName: s3Config.bucketName,
+        s3Acl: s3Config.acl,
         dumpServerEndpoint: dumpServer.endpoint,
         dumpServerHeaders: dumpServer.headers,
       };

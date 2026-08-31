@@ -5,8 +5,7 @@ import { jsLogger, type Logger } from '@map-colonies/js-logger';
 import { CleanupRegistry } from '@map-colonies/cleanup-registry';
 import { instancePerContainerCachingFactory } from 'tsyringe';
 import axios, { type AxiosInstance } from 'axios';
-import { S3Client } from '@aws-sdk/client-s3';
-import { SERVICES, CLI_NAME, CLI_BUILDER, EXIT_CODE, ExitCodes, ON_SIGNAL, S3_REGION } from '@common/constants';
+import { SERVICES, CLI_NAME, CLI_BUILDER, EXIT_CODE, ExitCodes, ON_SIGNAL } from '@common/constants';
 import { getConfig, type ConfigType } from '@common/config';
 import { getTracing } from '@common/tracing';
 import type { InjectionObject } from '@common/dependencyRegistration';
@@ -14,9 +13,8 @@ import { registerDependencies } from '@common/dependencyRegistration';
 import { cliBuilderFactory } from './cliBuilderFactory';
 import { createCommandFactory, CREATE_COMMAND_FACTORY } from './commands/create/createFactory';
 import { pgDumpCommandFactory, PG_DUMP_COMMAND_FACTORY } from './commands/pgDump/pgDumpFactory';
-import { pgDumpManagerFactory, PG_DUMP_MANAGER_FACTORY } from './commands/pgDump/pgDumpManagerFactory';
 import { scheduleCommandFactory, SCHEDULE_COMMAND_FACTORY } from './commands/schedule/scheduleFactory';
-import { CheckError } from './common/errors';
+import { s3ClientFactory } from './s3client/s3ClientFactory';
 
 export interface RegisterOptions {
   override?: InjectionObject<unknown>[];
@@ -28,11 +26,6 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
 
   try {
     const dependencies: InjectionObject<unknown>[] = [
-      { token: CLI_BUILDER, provider: { useFactory: cliBuilderFactory } },
-      { token: PG_DUMP_COMMAND_FACTORY, provider: { useFactory: pgDumpCommandFactory } },
-      { token: CREATE_COMMAND_FACTORY, provider: { useFactory: createCommandFactory } },
-      { token: PG_DUMP_MANAGER_FACTORY, provider: { useFactory: pgDumpManagerFactory } },
-      { token: SCHEDULE_COMMAND_FACTORY, provider: { useFactory: scheduleCommandFactory } },
       { token: SERVICES.CONFIG, provider: { useFactory: () => getConfig() } },
       {
         token: SERVICES.LOGGER,
@@ -48,6 +41,10 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
           deps.register(SERVICES.LOGGER, { useValue: logger });
         },
       },
+      { token: CLI_BUILDER, provider: { useFactory: cliBuilderFactory } },
+      { token: PG_DUMP_COMMAND_FACTORY, provider: { useFactory: pgDumpCommandFactory } },
+      { token: CREATE_COMMAND_FACTORY, provider: { useFactory: createCommandFactory } },
+      { token: SCHEDULE_COMMAND_FACTORY, provider: { useFactory: scheduleCommandFactory } },
       {
         token: SERVICES.CLEANUP_REGISTRY,
         provider: { useValue: cleanupRegistry },
@@ -91,16 +88,7 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
       },
       {
         token: SERVICES.S3,
-        provider: {
-          useFactory: instancePerContainerCachingFactory((container: DependencyContainer): S3Client => {
-            const config = container.resolve<ConfigType>(SERVICES.CONFIG);
-            const endpoint = config.get('s3.endpoint');
-            if (endpoint === undefined) {
-              throw new CheckError('s3.endpoint must be configured to use the s3 client', 's3', { endpoint });
-            }
-            return new S3Client({ endpoint, region: S3_REGION, forcePathStyle: true });
-          }),
-        },
+        provider: { useFactory: instancePerContainerCachingFactory(s3ClientFactory) },
       },
     ];
 

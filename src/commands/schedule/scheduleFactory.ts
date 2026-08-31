@@ -8,20 +8,22 @@ import { ErrorWithExitCode, CheckError } from '@common/errors';
 import type { ArstotzkaConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
-import { stateSourceCheck } from '../common/checks';
+import { httpServerFactory, RunInProgressError } from '@src/httpServer/httpServerFactory';
+import { s3ConfigCheck, stateSourceCheck } from '../common/checks';
 import type { CreatePipelineArgs, PgDumpPipelineArgs } from '../common/pipelineRunner';
 import { runCreatePipeline, runPgDumpPipeline } from '../common/pipelineRunner';
 import { CreateManager } from '../create/createManager';
-import type { PgDumpManager } from '../pgDump/pgDumpManager';
-import { PG_DUMP_MANAGER_FACTORY } from '../pgDump/pgDumpManagerFactory';
+import { PgDumpManager } from '../pgDump/pgDumpManager';
 import { cronExpressionCheck } from './checks';
+
+const DEFAULT_HTTP_SERVER_PORT = 8080;
 
 export const SCHEDULE_COMMAND_FACTORY = Symbol('ScheduleCommandFactory');
 
 export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependencyContainer) => {
   const command = 'schedule';
 
-  const describe = 'run the create or pg_dump pipeline repeatedly on a cron schedule';
+  const describe = 'run the create or pg_dump pipeline repeatedly on a cron schedule, and on demand via an http trigger';
 
   const logger = dependencyContainer.resolve<Logger>(SERVICES.LOGGER);
 
@@ -45,51 +47,73 @@ export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependenc
       }
       cronExpressionCheck(cronExpression);
 
-      const runOnInit = config.get('cli.schedule.runOnInit');
       const outputFormat = config.get('cli.outputFormat');
       const cleanupMode = config.get('cli.cleanupMode');
 
-      const runOnce = async (): Promise<void> => {
-        try {
-          if (target === 'create') {
-            const s3BucketName = config.get('s3.bucketName');
-            if (s3BucketName === undefined) {
-              throw new CheckError('s3.bucketName must be configured when target is "create"', 's3.bucketName', s3BucketName);
-            }
+      const runPipeline = async (runTarget: 'create' | 'pg_dump', stateSourceOverride?: string): Promise<void> => {
+        const effectiveStateSource = stateSourceOverride ?? stateSource;
 
-            const args: CreatePipelineArgs = {
-              outputFormat,
-              stateSource,
-              cleanupMode,
-              resume: config.get('cli.resume'),
-              info: config.get('cli.info'),
-              s3BucketName,
-              s3Acl: config.get('s3.acl'),
-              dumpServerEndpoint: config.get('cli.dumpServer.endpoint'),
-              dumpServerHeaders: config.get('cli.dumpServer.headers'),
-            };
-            const manager = dependencyContainer.resolve(CreateManager);
-            await runCreatePipeline(manager, args, logger, arstotzkaConfig);
-          } else {
-            const args: PgDumpPipelineArgs = { outputFormat, stateSource, cleanupMode };
-            const manager = dependencyContainer.resolve<PgDumpManager>(PG_DUMP_MANAGER_FACTORY);
-            await runPgDumpPipeline(manager, args, logger, arstotzkaConfig);
-          }
+        if (runTarget === 'create') {
+          const s3Config = config.get('s3');
+          s3ConfigCheck(s3Config);
 
-          logger.info({ msg: 'scheduled run finished successfully', command, target });
-        } catch (error) {
-          terminateChildren();
-          logger.error({ err: error, msg: 'scheduled run failed, will retry on next tick', command, target });
+          const args: CreatePipelineArgs = {
+            outputFormat,
+            stateSource: effectiveStateSource,
+            cleanupMode,
+            resume: config.get('cli.resume'),
+            info: config.get('cli.info'),
+            s3BucketName: s3Config.bucketName,
+            s3Acl: s3Config.acl,
+            dumpServerEndpoint: config.get('cli.dumpServer.endpoint'),
+            dumpServerHeaders: config.get('cli.dumpServer.headers'),
+          };
+          const manager = dependencyContainer.resolve(CreateManager);
+          await runCreatePipeline(manager, args, logger, arstotzkaConfig);
+        } else {
+          const args: PgDumpPipelineArgs = { outputFormat, stateSource: effectiveStateSource, cleanupMode };
+          const manager = dependencyContainer.resolve(PgDumpManager);
+          await runPgDumpPipeline(manager, args, logger, arstotzkaConfig);
         }
       };
 
-      if (runOnInit) {
-        await runOnce();
-      }
+      let isRunInProgress = false;
 
-      const task = cronSchedule(cronExpression, runOnce, { noOverlap: true, name: 'planet-dumper-schedule' });
+      const guardedRunPipeline = async (runTarget: 'create' | 'pg_dump', stateSourceOverride?: string): Promise<void> => {
+        if (isRunInProgress) {
+          throw new RunInProgressError('a run is already in progress');
+        }
+        isRunInProgress = true;
+        try {
+          await runPipeline(runTarget, stateSourceOverride);
+        } finally {
+          isRunInProgress = false;
+        }
+      };
+
+      const cronTick = async (): Promise<void> => {
+        try {
+          await guardedRunPipeline(target);
+          logger.info({ msg: 'scheduled run finished successfully', command, target });
+        } catch (error) {
+          if (!(error instanceof RunInProgressError)) {
+            terminateChildren();
+            logger.error({ err: error, msg: 'scheduled run failed, will retry on next tick', command, target });
+          }
+        }
+      };
+
+      const task = cronSchedule(cronExpression, cronTick, { noOverlap: true, name: 'planet-dumper-schedule' });
       task.on('execution:overlap', () => {
         logger.warn({ msg: 'skipped scheduled tick because the previous run is still in-flight', command, target });
+      });
+
+      const httpServerPort = Number(process.env.HTTP_SERVER_PORT ?? DEFAULT_HTTP_SERVER_PORT);
+      const httpServer = httpServerFactory(logger, {
+        runPgDump: async () => guardedRunPipeline('pg_dump'),
+        runCreate: async (stateSourceOverride) => guardedRunPipeline('create', stateSourceOverride),
+      }).listen(httpServerPort, () => {
+        logger.info({ msg: 'http trigger server listening', port: httpServerPort });
       });
 
       logger.info({ msg: 'scheduler armed, waiting for ticks', command, cronExpression, target });
@@ -97,7 +121,7 @@ export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependenc
       await new Promise<void>((resolve) => {
         const shutdown = (signal: string): void => {
           logger.info({ msg: 'received shutdown signal, stopping scheduler', signal });
-          void Promise.resolve(task.stop()).finally(resolve);
+          void Promise.all([Promise.resolve(task.stop()), new Promise<void>((res) => httpServer.close(() => res()))]).finally(resolve);
         };
         process.once('SIGTERM', () => shutdown('SIGTERM'));
         process.once('SIGINT', () => shutdown('SIGINT'));

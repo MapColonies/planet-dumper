@@ -6,7 +6,6 @@ import { getTasks } from 'node-cron';
 import { scheduleCommandFactory } from '@src/commands/schedule/scheduleFactory';
 import { SERVICES } from '@common/constants';
 import { PgDumpManager } from '@src/commands/pgDump/pgDumpManager';
-import { PG_DUMP_MANAGER_FACTORY } from '@src/commands/pgDump/pgDumpManagerFactory';
 import { buildConfig, buildFsRepository, delay, disabledArstotzkaConfig } from '@tests/fixtures';
 
 describe('schedule command - noOverlap', () => {
@@ -37,7 +36,7 @@ describe('schedule command - noOverlap', () => {
     childContainer.register(SERVICES.LOGGER, { useValue: logger });
     childContainer.register(SERVICES.CONFIG, { useValue: buildConfig() });
     childContainer.register(SERVICES.ARSTOTZKA, { useValue: disabledArstotzkaConfig });
-    childContainer.register(PG_DUMP_MANAGER_FACTORY, { useValue: manager });
+    childContainer.register(PgDumpManager, { useValue: manager });
 
     const { handler } = scheduleCommandFactory(childContainer);
     const handlerPromise = handler({ _: [], $0: 'planet-dumper' });

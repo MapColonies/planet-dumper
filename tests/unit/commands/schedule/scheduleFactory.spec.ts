@@ -2,9 +2,11 @@ import { container } from 'tsyringe';
 import type { DependencyContainer } from 'tsyringe';
 import type { Logger } from '@map-colonies/js-logger';
 import { getTasks } from 'node-cron';
+import type * as nodeCronModule from 'node-cron';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { scheduleCommandFactory } from '@src/commands/schedule/scheduleFactory';
-import { PG_DUMP_MANAGER_FACTORY } from '@src/commands/pgDump/pgDumpManagerFactory';
+import { RunInProgressError } from '@src/httpServer/httpServerFactory';
+import type * as httpServerFactoryModule from '@src/httpServer/httpServerFactory';
 import { runCreatePipeline, runPgDumpPipeline } from '@src/commands/common/pipelineRunner';
 import { terminateChildren } from '@common/spawner';
 import { EXIT_CODE, ExitCodes, SERVICES } from '@common/constants';
@@ -12,7 +14,13 @@ import { CreateManager } from '@src/commands/create/createManager';
 import { PgDumpManager } from '@src/commands/pgDump/pgDumpManager';
 import { buildConfig, buildCreateManager, buildLogger, buildPgDumpManager, disabledArstotzkaConfig } from '@tests/fixtures';
 
-// a cron expression that only fires once a year, so tests only ever observe the runOnInit tick, not a real one
+interface CapturedTriggers {
+  runPgDump: () => Promise<void>;
+  runCreate: (stateSource?: string) => Promise<void>;
+}
+
+// a cron expression that only fires once a year - schedule() itself is mocked below (never really ticks),
+// but cronExpressionCheck still validates this for real, so it has to be a genuinely valid expression
 const NEVER_DURING_TEST_CRON = '0 0 0 1 1 *';
 
 vi.mock('@src/commands/common/pipelineRunner', () => ({
@@ -23,6 +31,40 @@ vi.mock('@src/commands/common/pipelineRunner', () => ({
 vi.mock('@common/spawner', () => ({
   terminateChildren: vi.fn(),
 }));
+
+const { httpServerFactoryMock, getCapturedTriggers } = vi.hoisted(() => {
+  let capturedTriggers: CapturedTriggers | undefined;
+  const httpServerFactoryMock = vi.fn((logger: unknown, triggers: CapturedTriggers) => {
+    capturedTriggers = triggers;
+    return {
+      listen: (port: number, cb?: () => void) => {
+        cb?.();
+        return { close: (closeCb?: () => void) => closeCb?.() };
+      },
+    };
+  });
+  return { httpServerFactoryMock, getCapturedTriggers: (): CapturedTriggers | undefined => capturedTriggers };
+});
+
+vi.mock('@src/httpServer/httpServerFactory', async (importOriginal) => {
+  const actual = await importOriginal<typeof httpServerFactoryModule>();
+  return { ...actual, httpServerFactory: httpServerFactoryMock };
+});
+
+const { cronScheduleMock, getCapturedCronTick } = vi.hoisted(() => {
+  let capturedCronTick: (() => Promise<void>) | undefined;
+  const stubTask = { on: vi.fn(), stop: vi.fn() };
+  const cronScheduleMock = vi.fn((expression: string, callback: () => Promise<void>) => {
+    capturedCronTick = callback;
+    return stubTask;
+  });
+  return { cronScheduleMock, getCapturedCronTick: (): (() => Promise<void>) | undefined => capturedCronTick };
+});
+
+vi.mock('node-cron', async (importOriginal) => {
+  const actual = await importOriginal<typeof nodeCronModule>();
+  return { ...actual, schedule: cronScheduleMock };
+});
 
 const runCreatePipelineMock = vi.mocked(runCreatePipeline);
 const runPgDumpPipelineMock = vi.mocked(runPgDumpPipeline);
@@ -44,7 +86,7 @@ const buildDependencyContainer = async (overrides: {
   dependencyContainer.register(SERVICES.CONFIG, { useValue: config });
   dependencyContainer.register(SERVICES.ARSTOTZKA, { useValue: disabledArstotzkaConfig });
   dependencyContainer.register(CreateManager, { useValue: createManager });
-  dependencyContainer.register(PG_DUMP_MANAGER_FACTORY, { useValue: pgDumpManager });
+  dependencyContainer.register(PgDumpManager, { useValue: pgDumpManager });
 
   return dependencyContainer;
 };
@@ -53,13 +95,16 @@ const buildDependencyContainer = async (overrides: {
 const validConfig = (overrides: Record<string, unknown> = {}): ReturnType<typeof buildConfig> =>
   buildConfig({ 'cli.schedule.cronExpression': NEVER_DURING_TEST_CRON, ...overrides });
 
-const runUntilArmedThenShutdown = async (handler: (args: { _: string[]; $0: string }) => Promise<void>, logger: Logger): Promise<void> => {
-  const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
-
+// NOTE: this must not create-and-return the handler's promise itself - an async function that
+// `return`s a promise implicitly awaits it before its own caller gets control back, which would
+// deadlock here (the promise only resolves after SIGTERM, which the caller sends *after* arming).
+const waitForArmed = async (logger: Logger): Promise<void> => {
   await vi.waitFor(() => {
     expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ msg: 'scheduler armed, waiting for ticks' }));
   });
+};
 
+const shutdown = async (handlerPromise: Promise<void>): Promise<void> => {
   process.emit('SIGTERM');
   await handlerPromise;
 };
@@ -76,13 +121,17 @@ describe('scheduleCommandFactory', () => {
   });
 
   describe('Happy Path', () => {
-    it('runs the pg_dump pipeline immediately on init when runOnInit is true, then arms and shuts down cleanly', async () => {
+    it('runs the pg_dump pipeline when triggered via the http api', async () => {
       const logger = await buildLogger();
-      const config = validConfig({ 'cli.schedule.target': 'pg_dump', 'cli.schedule.runOnInit': true });
+      const config = validConfig({ 'cli.schedule.target': 'pg_dump' });
       const dependencyContainer = await buildDependencyContainer({ config, logger });
       const { handler } = scheduleCommandFactory(dependencyContainer);
 
-      await runUntilArmedThenShutdown(handler, logger);
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+      await getCapturedTriggers()?.runPgDump();
+      await shutdown(handlerPromise);
 
       expect(runPgDumpPipelineMock).toHaveBeenCalledWith(
         expect.any(PgDumpManager),
@@ -91,15 +140,12 @@ describe('scheduleCommandFactory', () => {
         disabledArstotzkaConfig
       );
       expect(runCreatePipelineMock).not.toHaveBeenCalled();
-      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ msg: 'scheduled run finished successfully', target: 'pg_dump' }));
-      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ msg: 'schedule command shutting down' }));
     });
 
-    it('runs the create pipeline with s3 args when target is create', async () => {
+    it('runs the create pipeline with s3 args when triggered via the http api, using config stateSource by default', async () => {
       const logger = await buildLogger();
       const config = validConfig({
         'cli.schedule.target': 'create',
-        'cli.schedule.runOnInit': true,
         'cli.resume': false,
         'cli.info': false,
         's3.bucketName': 'bucket',
@@ -110,7 +156,11 @@ describe('scheduleCommandFactory', () => {
       const dependencyContainer = await buildDependencyContainer({ config, logger });
       const { handler } = scheduleCommandFactory(dependencyContainer);
 
-      await runUntilArmedThenShutdown(handler, logger);
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+      await getCapturedTriggers()?.runCreate();
+      await shutdown(handlerPromise);
 
       expect(runCreatePipelineMock).toHaveBeenCalledWith(
         expect.any(CreateManager),
@@ -121,16 +171,90 @@ describe('scheduleCommandFactory', () => {
       expect(runPgDumpPipelineMock).not.toHaveBeenCalled();
     });
 
-    it('does not run a tick before arming when runOnInit is false', async () => {
+    it('runs the create pipeline with a stateSource override from the api instead of config', async () => {
       const logger = await buildLogger();
-      const config = validConfig({ 'cli.schedule.runOnInit': false });
+      const config = validConfig({
+        'cli.schedule.target': 'create',
+        'cli.resume': false,
+        'cli.info': false,
+        's3.bucketName': 'bucket',
+        's3.acl': 'private',
+        'cli.dumpServer.endpoint': undefined,
+        'cli.dumpServer.headers': [],
+      });
       const dependencyContainer = await buildDependencyContainer({ config, logger });
       const { handler } = scheduleCommandFactory(dependencyContainer);
 
-      await runUntilArmedThenShutdown(handler, logger);
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+      await getCapturedTriggers()?.runCreate('999');
+      await shutdown(handlerPromise);
+
+      expect(runCreatePipelineMock).toHaveBeenCalledWith(
+        expect.any(CreateManager),
+        expect.objectContaining({ stateSource: '999' }),
+        logger,
+        disabledArstotzkaConfig
+      );
+    });
+
+    it('does not run any pipeline automatically at startup, until the api is triggered or a tick fires', async () => {
+      const logger = await buildLogger();
+      const config = validConfig();
+      const dependencyContainer = await buildDependencyContainer({ config, logger });
+      const { handler } = scheduleCommandFactory(dependencyContainer);
+
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+      await shutdown(handlerPromise);
 
       expect(runPgDumpPipelineMock).not.toHaveBeenCalled();
       expect(runCreatePipelineMock).not.toHaveBeenCalled();
+    });
+
+    it('runs the configured target pipeline when a cron tick fires', async () => {
+      const logger = await buildLogger();
+      const config = validConfig({ 'cli.schedule.target': 'pg_dump' });
+      const dependencyContainer = await buildDependencyContainer({ config, logger });
+      const { handler } = scheduleCommandFactory(dependencyContainer);
+
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+      await getCapturedCronTick()?.();
+      await shutdown(handlerPromise);
+
+      expect(runPgDumpPipelineMock).toHaveBeenCalledOnce();
+      expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ msg: 'scheduled run finished successfully', target: 'pg_dump' }));
+    });
+
+    it('rejects a second concurrent trigger while a run is already in progress, regardless of which trigger it came from', async () => {
+      const logger = await buildLogger();
+      const config = validConfig({ 'cli.schedule.target': 'pg_dump' });
+
+      let resolveFirstRun: () => void = () => {};
+      runPgDumpPipelineMock.mockImplementationOnce(
+        async () =>
+          new Promise<void>((resolve) => {
+            resolveFirstRun = resolve;
+          })
+      );
+
+      const dependencyContainer = await buildDependencyContainer({ config, logger });
+      const { handler } = scheduleCommandFactory(dependencyContainer);
+
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+
+      const firstRunPromise = getCapturedTriggers()?.runPgDump();
+      await expect(getCapturedTriggers()?.runCreate()).rejects.toThrow(RunInProgressError);
+
+      resolveFirstRun();
+      await firstRunPromise;
+      await shutdown(handlerPromise);
     });
   });
 
@@ -192,11 +316,15 @@ describe('scheduleCommandFactory', () => {
     it('logs and retries on the next tick, without crashing the scheduler, when s3.bucketName is missing for a create-target tick', async () => {
       const logger = await buildLogger();
       const registerSpy = vi.spyOn(container, 'register');
-      const config = validConfig({ 'cli.schedule.target': 'create', 'cli.schedule.runOnInit': true, 's3.bucketName': undefined });
+      const config = validConfig({ 'cli.schedule.target': 'create', 's3.bucketName': undefined });
       const dependencyContainer = await buildDependencyContainer({ config, logger });
       const { handler } = scheduleCommandFactory(dependencyContainer);
 
-      await runUntilArmedThenShutdown(handler, logger);
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+      await getCapturedCronTick()?.();
+      await shutdown(handlerPromise);
 
       expect(runCreatePipelineMock).not.toHaveBeenCalled();
       expect(terminateChildrenMock).toHaveBeenCalledOnce();
@@ -207,11 +335,15 @@ describe('scheduleCommandFactory', () => {
     it('logs and retries on the next tick, without crashing the scheduler, when the pipeline itself throws', async () => {
       const logger = await buildLogger();
       runPgDumpPipelineMock.mockRejectedValueOnce(new Error('pg_dump failed'));
-      const config = validConfig({ 'cli.schedule.runOnInit': true });
+      const config = validConfig();
       const dependencyContainer = await buildDependencyContainer({ config, logger });
       const { handler } = scheduleCommandFactory(dependencyContainer);
 
-      await runUntilArmedThenShutdown(handler, logger);
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
+      const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
+      await waitForArmed(logger);
+      await getCapturedCronTick()?.();
+      await shutdown(handlerPromise);
 
       expect(terminateChildrenMock).toHaveBeenCalledOnce();
       expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ msg: 'scheduled run failed, will retry on next tick', target: 'pg_dump' }));

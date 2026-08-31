@@ -32,7 +32,9 @@ cron:
   enabled: false
   schedule: '0 0 * * 0'
   target: 'create' # which pipeline to run on each tick: 'create' | 'pg_dump'
-  runOnInit: false 
+
+server:
+  port: 8080 # the schedule command's http trigger server - POST /create, POST /pg_dump, GET /health
 
 resources:
   enabled: false

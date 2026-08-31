@@ -3,7 +3,6 @@ import type { DependencyContainer } from 'tsyringe';
 import type { Logger } from '@map-colonies/js-logger';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { pgDumpCommandFactory } from '@src/commands/pgDump/pgDumpFactory';
-import { PG_DUMP_MANAGER_FACTORY } from '@src/commands/pgDump/pgDumpManagerFactory';
 import { runPgDumpPipeline } from '@src/commands/common/pipelineRunner';
 import { terminateChildren } from '@common/spawner';
 import { EXIT_CODE, ExitCodes, SERVICES } from '@common/constants';
@@ -35,7 +34,7 @@ const buildDependencyContainer = async (overrides: {
   dependencyContainer.register(SERVICES.LOGGER, { useValue: logger });
   dependencyContainer.register(SERVICES.CONFIG, { useValue: config });
   dependencyContainer.register(SERVICES.ARSTOTZKA, { useValue: disabledArstotzkaConfig });
-  dependencyContainer.register(PG_DUMP_MANAGER_FACTORY, { useValue: manager });
+  dependencyContainer.register(PgDumpManager, { useValue: manager });
 
   return dependencyContainer;
 };
