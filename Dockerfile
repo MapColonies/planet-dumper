@@ -1,4 +1,4 @@
-ARG NODE_VERSION=16
+ARG NODE_VERSION=24
 
 FROM ubuntu:20.04 AS buildPlanetDumpNg
 

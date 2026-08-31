@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */ // s3-client object commands arguments
-import { Readable } from 'stream';
+import { Readable } from 'node:stream';
 import { inject, injectable } from 'tsyringe';
-import { Logger } from '@map-colonies/js-logger';
+import type { Logger } from '@map-colonies/js-logger';
 import { Upload } from '@aws-sdk/lib-storage';
 import {
   S3Client,
@@ -14,29 +14,25 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
-import { S3Error } from '../common/errors';
-import { S3_NOT_FOUND_ERROR_NAME, SERVICES } from '../common/constants';
-import { IConfig } from '../common/interfaces';
+import type { vectorPlanetDumperV1Type } from '@map-colonies/schemas';
+import { S3Error } from '@common/errors';
+import { S3_NOT_FOUND_ERROR_NAME, SERVICES } from '@common/constants';
+import type { ConfigType } from '@common/config';
 
 type HeadCommandType = 'bucket' | 'object';
 
 const BYTES_IN_MB = 1048576;
 
-interface UploadOptions {
-  concurrency?: number;
-  partSize?: number;
-}
-
 @injectable()
 export class S3ClientWrapper {
-  private readonly uploadOptions: UploadOptions;
+  private readonly uploadOptions: vectorPlanetDumperV1Type['s3']['upload'];
 
   public constructor(
     @inject(SERVICES.LOGGER) private readonly logger: Logger,
     @inject(SERVICES.S3) private readonly s3Client: S3Client,
-    @inject(SERVICES.CONFIG) config: IConfig
+    @inject(SERVICES.CONFIG) config: ConfigType
   ) {
-    this.uploadOptions = config.get<UploadOptions>('s3.upload');
+    this.uploadOptions = config.get('s3.upload');
   }
 
   public async getObjectWrapper(bucketName: string, key: string): Promise<NodeJS.ReadStream> {
@@ -53,7 +49,7 @@ export class S3ClientWrapper {
     }
   }
 
-  public async putObjectWrapper(bucket: string, key: string, body: Buffer, acl?: ObjectCannedACL | string): Promise<void> {
+  public async putObjectWrapper(bucket: string, key: string, body: Buffer, acl?: string): Promise<void> {
     this.logger.debug({ msg: 'putting key in bucket', key, bucketName: bucket, acl });
 
     try {
@@ -66,7 +62,7 @@ export class S3ClientWrapper {
     }
   }
 
-  public async uploadStreamInParallel(bucket: string, key: string, body: Readable | Buffer, acl?: ObjectCannedACL | string): Promise<void> {
+  public async uploadStreamInParallel(bucket: string, key: string, body: Readable | Buffer, acl?: string): Promise<void> {
     this.logger.debug({ msg: 'uploading in parallel key in bucket', key, bucketName: bucket, acl, uploadOptions: this.uploadOptions });
 
     try {
@@ -74,7 +70,7 @@ export class S3ClientWrapper {
         client: this.s3Client,
         params: { Bucket: bucket, Key: key, Body: body, ACL: acl as ObjectCannedACL },
         queueSize: this.uploadOptions.concurrency,
-        partSize: this.uploadOptions.partSize != null ? this.uploadOptions.partSize * BYTES_IN_MB : undefined,
+        partSize: this.uploadOptions.partSize * BYTES_IN_MB,
       });
 
       upload.on('httpUploadProgress', (progress) => {

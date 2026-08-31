@@ -30,13 +30,11 @@ job:
 
 cron:
   enabled: false
-  apiVersion: 'batch/v1' # depends on openshift version batch/v1 or batch/v1beta1
-  restartPolicy: OnFailure
-  schedule: '* * * * *'
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 3
-  concurrencyPolicy: Forbid
-  startingDeadlineSeconds: 200
+  schedule: '0 0 * * 0'
+  target: 'create' # which pipeline to run on each tick: 'create' | 'pg_dump'
+
+server:
+  port: 8080 # the schedule command's http trigger server - POST /create, POST /pg_dump, GET /health
 
 resources:
   enabled: false
@@ -105,7 +103,8 @@ cli:
       enabled: true
       endpoint: http://dump-server.com
       attachHeaders: false
-      headers: X-API-KEY=apikey
+      headers:
+        - X-API-KEY=apikey
 
 arstotzka:
   enabled: false

@@ -1,9 +1,10 @@
-import { Logger } from '@map-colonies/js-logger';
-import { AxiosInstance } from 'axios';
+import type { Logger } from '@map-colonies/js-logger';
+import type { AxiosInstance } from 'axios';
 import { inject, injectable } from 'tsyringe';
-import { SERVICES } from '../common/constants';
-import { DumpMetadata, DumpServerConfig } from '../common/interfaces';
-import { AxiosRequestArgsWithData, BaseClient, HttpResponse } from './baseClient';
+import { SERVICES } from '@common/constants';
+import type { DumpMetadata, DumpServerConfig } from '@common/interfaces';
+import { BaseClient } from './baseClient';
+import type { AxiosRequestArgsWithData, HttpResponse } from './baseClient';
 
 const DUMP_METADATA_ENDPOINT = 'dumps';
 
@@ -22,8 +23,11 @@ export class DumpServerClient extends BaseClient {
     const { dumpServerEndpoint: endpoint, dumpServerHeaders: headers } = dumpServerConfig;
 
     const requestHeaders: Record<string, string> = {};
-    headers.map((headerKeyValue) => {
+    headers.forEach((headerKeyValue) => {
       const [key, value] = headerKeyValue.trim().split('=');
+      if (key === undefined || value === undefined) {
+        return;
+      }
       requestHeaders[key] = value;
     });
 
