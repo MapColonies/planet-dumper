@@ -1,84 +1,43 @@
-import { Argv, CommandModule, Arguments } from 'yargs';
-import { Logger } from '@map-colonies/js-logger';
-import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
-import { ActionStatus } from '@map-colonies/arstotzka-common';
-import { container, FactoryFunction } from 'tsyringe';
-import { DEFAULT_STATE, ExitCodes, EXIT_CODE, SERVICES, WORKDIR } from '../../common/constants';
-import { ErrorWithExitCode } from '../../common/errors';
-import { ArstotzkaConfig } from '../../common/interfaces';
-import { check as checkWrapper } from '../../wrappers/check';
-import { CleanupMode, GlobalArguments as PgDumpArguments } from '../common/types';
+import type { CommandModule } from 'yargs';
+import type { Logger } from '@map-colonies/js-logger';
+import type { FactoryFunction } from 'tsyringe';
+import { container } from 'tsyringe';
+import { ExitCodes, EXIT_CODE, SERVICES } from '@common/constants';
+import { ErrorWithExitCode } from '@common/errors';
+import type { ArstotzkaConfig } from '@common/interfaces';
+import type { ConfigType } from '@common/config';
+import { terminateChildren } from '@common/spawner';
 import { stateSourceCheck } from '../common/checks';
-import { terminateChildren } from '../../common/spawner';
-import { emptyDirectory } from '../../common/util';
+import { runPgDumpPipeline, type PgDumpPipelineArgs } from '../common/pipelineRunner';
 import { PgDumpManager } from './pgDumpManager';
-import { PG_DUMP_MANAGER_FACTORY } from './pgDumpManagerFactory';
 
 export const PG_DUMP_COMMAND_FACTORY = Symbol('PgDumpCommandFactory');
 
-export const pgDumpCommandFactory: FactoryFunction<CommandModule<PgDumpArguments, PgDumpArguments>> = (dependencyContainer) => {
+export const pgDumpCommandFactory: FactoryFunction<CommandModule> = (dependencyContainer) => {
   const command = 'pg_dump';
 
   const describe = 'create a postgres dump from an existing osm database';
 
   const logger = dependencyContainer.resolve<Logger>(SERVICES.LOGGER);
 
-  const builder = (yargs: Argv<PgDumpArguments>): Argv<PgDumpArguments> => {
-    yargs
-      .option('outputFormat', {
-        alias: ['o', 'output-format'],
-        description: 'The resulting output name format, example: prefix_{state}_{timestamp}_suffix.pbf',
-        nargs: 1,
-        type: 'string',
-        demandOption: true,
-      })
-      .option('stateSource', {
-        alias: ['s'],
-        description: 'Determines state seqeunce number to source',
-        nargs: 1,
-        type: 'string',
-        default: DEFAULT_STATE.toString(),
-      })
-      .option('cleanupMode', {
-        alias: 'c',
-        describe: 'the command execution cleanup mode',
-        choices: ['none', 'pre-clean-others', 'post-clean-others'] as CleanupMode[],
-        nargs: 1,
-        type: 'string',
-        default: 'none' as CleanupMode,
-      })
-      .check(checkWrapper(stateSourceCheck, logger));
-    return yargs;
-  };
+  const handler = async (): Promise<void> => {
+    logger.debug({ msg: 'starting command execution', command });
 
-  const handler = async (args: Arguments<PgDumpArguments>): Promise<void> => {
-    const { outputFormat, stateSource, cleanupMode } = args;
-
-    logger.debug({ msg: 'starting command execution', command, args });
-
-    let pgMediator: StatefulMediator | undefined;
-
+    const config = dependencyContainer.resolve<ConfigType>(SERVICES.CONFIG);
     const arstotzkaConfig = dependencyContainer.resolve<ArstotzkaConfig>(SERVICES.ARSTOTZKA);
-    if (arstotzkaConfig.enabled) {
-      pgMediator = new StatefulMediator({ ...arstotzkaConfig.mediator, serviceId: arstotzkaConfig.services['planetDumperPg'], logger });
-    }
-
-    const manager = dependencyContainer.resolve<PgDumpManager>(PG_DUMP_MANAGER_FACTORY);
+    const manager = dependencyContainer.resolve(PgDumpManager);
 
     try {
-      const state = await manager.getState(stateSource);
+      const stateSource = config.get('cli.stateSource');
+      stateSourceCheck(stateSource);
 
-      // pre cleanup
-      if (cleanupMode === 'pre-clean-others') {
-        await emptyDirectory(WORKDIR, [state]);
-      }
+      const args: PgDumpPipelineArgs = {
+        outputFormat: config.get('cli.outputFormat'),
+        stateSource,
+        cleanupMode: config.get('cli.cleanupMode'),
+      };
 
-      await manager.createPgDump(outputFormat, false, pgMediator);
-
-      // post cleanup
-      if (cleanupMode === 'post-clean-others') {
-        await emptyDirectory(WORKDIR, [state]);
-      }
+      await runPgDumpPipeline(manager, args, logger, arstotzkaConfig);
 
       logger.info({ msg: 'finished command execution successfully', command, args });
     } catch (error) {
@@ -89,7 +48,6 @@ export const pgDumpCommandFactory: FactoryFunction<CommandModule<PgDumpArguments
       }
 
       terminateChildren();
-      await pgMediator?.updateAction({ status: ActionStatus.FAILED, metadata: { error } });
 
       container.register(EXIT_CODE, { useValue: exitCode });
       logger.error({ err: error, msg: 'an error occurred while executing command', command: command, exitCode });
@@ -99,7 +57,6 @@ export const pgDumpCommandFactory: FactoryFunction<CommandModule<PgDumpArguments
   return {
     command,
     describe,
-    builder,
     handler,
   };
 };

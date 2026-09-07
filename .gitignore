@@ -28,6 +28,9 @@ lib-cov
 coverage
 *.lcov
 
+# vitest html reporter output
+html
+
 # nyc test coverage
 .nyc_output
 
@@ -113,3 +116,4 @@ dist
 # Jest
 jest_html_reporters.html
 reports
+local*

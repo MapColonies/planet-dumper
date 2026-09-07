@@ -1,18 +1,16 @@
-import Format from 'string-format';
-import { DumpMetadata } from '../../common/interfaces';
+import stringFormat from 'string-format';
+import type { DumpMetadata } from '@common/interfaces';
 
-const now = new Date();
-
-export const nameFormat = (format: string, state?: string): string => {
-  return Format(format, { timestamp: now.toISOString(), state });
+export const nameFormat = (format: string, timestamp: Date, state?: string): string => {
+  return stringFormat(format, { timestamp: timestamp.toISOString(), state });
 };
 
-export const buildDumpMetadata = (format: string, state: string): DumpMetadata => {
-  const name = Format(format, { timestamp: now.toISOString(), state });
+export const buildDumpMetadata = (format: string, timestamp: Date, state: string): DumpMetadata => {
+  const name = stringFormat(format, { timestamp: timestamp.toISOString(), state });
 
   return {
     name,
-    timestamp: now,
+    timestamp,
     sequenceNumber: +state,
   };
 };

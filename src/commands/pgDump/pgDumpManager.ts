@@ -1,35 +1,33 @@
-import { join } from 'path';
+import { join } from 'node:path';
 import { inject, injectable } from 'tsyringe';
-import { Logger } from '@map-colonies/js-logger';
-import { AxiosInstance } from 'axios';
+import type { Logger } from '@map-colonies/js-logger';
+import type { AxiosInstance } from 'axios';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
-import { EMPTY_STRING, PG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
-import { InvalidStateFileError, PgDumpError } from '../../common/errors';
-import { Executable } from '../../common/types';
-import {
-  createDirectoryIfNotAlreadyExists,
-  fetchSequenceNumber,
-  getFileSize,
-  listFilesInDirectory,
-  removeDirectory,
-  streamToString,
-} from '../../common/util';
-import { spawnChild } from '../../common/spawner';
-import { IConfig, ILogger, PgDumpConfig, PostgresConfig } from '../../common/interfaces';
+import { EMPTY_STRING, PG_DUMP_DIR, SERVICES, WORKDIR } from '@common/constants';
+import { InvalidStateFileError, PgDumpError } from '@common/errors';
+import type { Executable } from '@common/types';
+import { fetchSequenceNumber, streamToString } from '@common/util';
+import { spawnChild } from '@common/spawner';
+import type { ILogger } from '@common/interfaces';
+import type { ConfigType } from '@common/config';
+import { FsRepository } from '@src/fsRepository/fsRepository';
 import { nameFormat } from '../common/helpers';
+import type { CleanupMode } from '../common/types';
 
 @injectable()
 export class PgDumpManager {
   public state = EMPTY_STRING;
+  public readonly timestamp = new Date();
 
   // eslint-disable-next-line @typescript-eslint/naming-convention
   protected readonly globalCommandArgs: Record<Executable, string[]> = { pg_dump: [], 'planet-dump-ng': [], osmium: [] };
 
   public constructor(
     @inject(SERVICES.LOGGER) public readonly logger: Logger,
-    @inject(SERVICES.CONFIG) public readonly config: IConfig,
-    @inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance
+    @inject(SERVICES.CONFIG) public readonly config: ConfigType,
+    @inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance,
+    @inject(FsRepository) protected readonly fsRepository: FsRepository
   ) {
     this.processConfig(config);
   }
@@ -39,10 +37,10 @@ export class PgDumpManager {
 
     // resume from existing pg dump if exists
     if (shouldResume) {
-      const existingPgDumps = await listFilesInDirectory(currentPgDumpDir);
+      const existingPgDumps = await this.fsRepository.listFilesInDirectory(currentPgDumpDir);
 
-      if (existingPgDumps.length > 0) {
-        const pgDumpFilePath = existingPgDumps[0];
+      const pgDumpFilePath = existingPgDumps[0];
+      if (pgDumpFilePath !== undefined) {
         this.logger.info({ msg: 'resuming from an existing pg dump', pgDumpFilePath, pgDumpDirList: existingPgDumps });
         return pgDumpFilePath;
       }
@@ -50,7 +48,7 @@ export class PgDumpManager {
 
     await mediator?.reserveAccess();
 
-    const pgDumpName = nameFormat(outputFormat, this.state);
+    const pgDumpName = nameFormat(outputFormat, this.timestamp, this.state);
     const pgDumpOutputPath = join(currentPgDumpDir, pgDumpName);
     const metadata = { pgDumpName, pgDumpOutputPath };
 
@@ -58,14 +56,14 @@ export class PgDumpManager {
     await mediator?.removeLock();
 
     // prepare state environment
-    await removeDirectory(currentPgDumpDir);
-    await createDirectoryIfNotAlreadyExists(currentPgDumpDir);
+    await this.fsRepository.removeDirectory(currentPgDumpDir);
+    await this.fsRepository.createDirectoryIfNotAlreadyExists(currentPgDumpDir);
 
     // execute command
     await this.executePgDump(pgDumpOutputPath);
 
     // collect metadata
-    const size = await getFileSize(pgDumpOutputPath);
+    const size = await this.fsRepository.getFileSize(pgDumpOutputPath);
 
     await mediator?.updateAction({ status: ActionStatus.COMPLETED, metadata: { size } });
 
@@ -95,6 +93,29 @@ export class PgDumpManager {
     return this.state;
   }
 
+  public async preCleanup(mode: CleanupMode, state: string): Promise<void> {
+    const preCleanupActions: Record<CleanupMode, () => Promise<void>> = {
+      'pre-clean-others': async () => this.fsRepository.emptyDirectory(WORKDIR, [state]),
+      none: async () => {},
+      'post-clean-workdir': async () => {},
+      'post-clean-others': async () => {},
+      'post-clean-all': async () => {},
+    };
+
+    await preCleanupActions[mode]();
+  }
+
+  public async postCleanup(mode: CleanupMode, state: string): Promise<void> {
+    const postCleanupActions: Record<CleanupMode, () => Promise<void>> = {
+      'post-clean-others': async () => this.fsRepository.emptyDirectory(WORKDIR, [state]),
+      none: async () => {},
+      'post-clean-workdir': async () => {},
+      'pre-clean-others': async () => {},
+      'post-clean-all': async () => {},
+    };
+    await postCleanupActions[mode]();
+  }
+
   public async commandWrapper(
     executable: Executable,
     args: string[],
@@ -120,8 +141,8 @@ export class PgDumpManager {
     return stdout;
   }
 
-  protected processConfig(config: IConfig): void {
-    const pgDumpConfig = config.get<PgDumpConfig>('pgDump');
+  protected processConfig(config: ConfigType): void {
+    const pgDumpConfig = config.get('pgDump');
 
     const pgDumpGlobalArgs = this.globalCommandArgs.pg_dump;
 
@@ -129,7 +150,7 @@ export class PgDumpManager {
       pgDumpGlobalArgs.push('--verbose');
     }
 
-    const postgresConfig = config.get<PostgresConfig>('postgres');
+    const postgresConfig = config.get('postgres');
     if (postgresConfig.enableSslAuth) {
       const { cert, key, ca } = postgresConfig.sslPaths;
 
@@ -145,7 +166,7 @@ export class PgDumpManager {
     const executable: Executable = 'pg_dump';
     const globalArgs = this.globalCommandArgs[executable];
     const args = [...globalArgs, '--format=custom', `--file=${pgDumpOutputPath}`];
-    const isVerbose = this.config.get<boolean>('pgDump.verbose');
+    const isVerbose = this.config.get('pgDump.verbose');
 
     await this.commandWrapper(executable, args, PgDumpError, undefined, undefined, isVerbose);
   }

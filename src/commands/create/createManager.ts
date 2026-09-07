@@ -1,28 +1,35 @@
-import { join, dirname } from 'path';
-import { createReadStream } from 'fs';
+import { join, dirname } from 'node:path';
 import { inject, injectable } from 'tsyringe';
-import { Logger } from '@map-colonies/js-logger';
+import type { Logger } from '@map-colonies/js-logger';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
-import { AxiosInstance } from 'axios';
-import { NG_DUMP_DIR, SERVICES, WORKDIR } from '../../common/constants';
-import { DumpServerClient } from '../../httpClient/dumpClient';
-import { S3ClientWrapper } from '../../s3client/s3Client';
-import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, OsmiumError, PlanetDumpNgError } from '../../common/errors';
-import { DumpMetadata, DumpServerConfig, IConfig, NgDumpConfig, OsmiumConfig } from '../../common/interfaces';
-import { Executable } from '../../common/types';
+import type { AxiosInstance } from 'axios';
+import { NG_DUMP_DIR, SERVICES, WORKDIR } from '@common/constants';
+import { DumpServerClient } from '@src/httpClient/dumpClient';
+import { S3ClientWrapper } from '@src/s3client/s3Client';
+import { FsRepository } from '@src/fsRepository/fsRepository';
+import { BucketDoesNotExistError, ObjectKeyAlreadyExistError, OsmiumError, PlanetDumpNgError } from '@common/errors';
+import type { DumpMetadata, DumpServerConfig } from '@common/interfaces';
+import type { ConfigType } from '@common/config';
+import { Executable } from '@common/types';
 import { PgDumpManager } from '../pgDump/pgDumpManager';
 import { nameFormat } from '../common/helpers';
-import { emptyDirectory, createDirectoryIfNotAlreadyExists, getFileSize } from '../../common/util';
+import type { CleanupMode } from '../common/types';
+
+export interface S3Uploader {
+  validateExistance: S3ClientWrapper['validateExistance'];
+  uploadStreamInParallel: S3ClientWrapper['uploadStreamInParallel'];
+}
 
 @injectable()
 export class CreateManager extends PgDumpManager {
   public constructor(
     @inject(SERVICES.LOGGER) logger: Logger,
-    @inject(SERVICES.CONFIG) config: IConfig,
+    @inject(SERVICES.CONFIG) config: ConfigType,
     @inject(SERVICES.HTTP_CLIENT) axios: AxiosInstance,
-    private readonly s3Client: S3ClientWrapper
+    @inject(FsRepository) fsRepository: FsRepository,
+    @inject(S3ClientWrapper) private readonly s3Client: S3Uploader
   ) {
-    super(logger, config, axios);
+    super(logger, config, axios, fsRepository);
   }
 
   public async createNgDump(
@@ -30,11 +37,11 @@ export class CreateManager extends PgDumpManager {
     pgDumpFilePath: string,
     shouldResume: boolean,
     shouldCollectInfo: boolean,
-    mediator?: StatefulMediator | undefined
+    mediator?: StatefulMediator
   ): Promise<string> {
     await mediator?.reserveAccess();
 
-    const ngDumpName = nameFormat(outputFormat, this.state);
+    const ngDumpName = nameFormat(outputFormat, this.timestamp, this.state);
     const currentNgDumpDir = join(WORKDIR, this.state, NG_DUMP_DIR);
     const ngDumpOutputPath = join(currentNgDumpDir, ngDumpName);
     const metadata: Record<string, unknown> = { ngDumpName, ngDumpOutputPath };
@@ -42,18 +49,18 @@ export class CreateManager extends PgDumpManager {
     await mediator?.createAction({ state: parseInt(this.state), metadata });
     await mediator?.removeLock();
 
-    await createDirectoryIfNotAlreadyExists(currentNgDumpDir);
+    await this.fsRepository.createDirectoryIfNotAlreadyExists(currentNgDumpDir);
 
     // if should not resume clear already existing mid dump files
     if (!shouldResume) {
-      await emptyDirectory(currentNgDumpDir);
+      await this.fsRepository.emptyDirectory(currentNgDumpDir);
     }
 
     // execute commmad
     await this.executeNgDump(pgDumpFilePath, ngDumpOutputPath, shouldResume);
 
     // collect metadata
-    metadata.size = await getFileSize(ngDumpOutputPath);
+    metadata.size = await this.fsRepository.getFileSize(ngDumpOutputPath);
 
     if (shouldCollectInfo) {
       const collectedInfo = await this.executeOsmium(ngDumpOutputPath);
@@ -71,7 +78,7 @@ export class CreateManager extends PgDumpManager {
     const executable: Executable = 'planet-dump-ng';
     const globalArgs = this.globalCommandArgs[executable];
     const args = [...globalArgs, `--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpFilePath}`];
-    const isVerbose = this.config.get<boolean>('ngDump.verbose');
+    const isVerbose = this.config.get('ngDump.verbose');
 
     if (shouldResume === true) {
       args.push('--resume');
@@ -86,7 +93,7 @@ export class CreateManager extends PgDumpManager {
     const executable: Executable = 'osmium';
     const globalArgs = this.globalCommandArgs[executable];
     const args = [...globalArgs, '--input-format', 'pbf', '--extended', '--json', ngDumpFilePath];
-    const isVerbose = this.config.get<boolean>('osmium.verbose');
+    const isVerbose = this.config.get('osmium.verbose');
 
     return this.commandWrapper(executable, args, OsmiumError, 'fileinfo', undefined, isVerbose);
   }
@@ -102,7 +109,7 @@ export class CreateManager extends PgDumpManager {
       throw new ObjectKeyAlreadyExistError(`object key ${key} already exist on specified bucket`);
     }
 
-    const fileStream = createReadStream(path);
+    const fileStream = this.fsRepository.createFileReadStream(path);
 
     await this.s3Client.uploadStreamInParallel(bucketName, key, fileStream, acl);
   }
@@ -117,18 +124,30 @@ export class CreateManager extends PgDumpManager {
     await dumpServerClient.postDumpMetadata(dumpServerConfig, { ...dumpMetadata, bucket: dumpMetadata.bucket as string });
   }
 
-  protected override processConfig(config: IConfig): void {
+  public override async postCleanup(mode: CleanupMode, state: string): Promise<void> {
+    const postCleanupActions: Record<CleanupMode, () => Promise<void>> = {
+      'post-clean-workdir': async () => this.fsRepository.emptyDirectory(join(WORKDIR, state)),
+      'post-clean-others': async () => this.fsRepository.emptyDirectory(WORKDIR, [state]),
+      'post-clean-all': async () => this.fsRepository.emptyDirectory(WORKDIR),
+      none: async () => {},
+      'pre-clean-others': async () => {},
+    };
+
+    await postCleanupActions[mode]();
+  }
+
+  protected override processConfig(config: ConfigType): void {
     super.processConfig(config);
 
-    const ngDumpConfig = config.get<NgDumpConfig>('ngDump');
+    const ngDumpConfig = config.get('ngDump');
 
     const ngDumpGlobalArgs = this.globalCommandArgs['planet-dump-ng'];
 
-    if (ngDumpConfig.maxConcurrency) {
+    if (ngDumpConfig.maxConcurrency !== undefined) {
       ngDumpGlobalArgs.push(`--max-concurrency=${ngDumpConfig.maxConcurrency.toString()}`);
     }
 
-    const osmiumConfig = config.get<OsmiumConfig>('osmium');
+    const osmiumConfig = config.get('osmium');
     const osmiumArgs = this.globalCommandArgs.osmium;
 
     if (osmiumConfig.verbose) {

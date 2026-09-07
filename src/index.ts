@@ -1,11 +1,9 @@
-/* eslint-disable import/first */
 // this import must be called before the first import of tsyring
 import 'reflect-metadata';
-import './common/tracing';
 import { hideBin } from 'yargs/helpers';
-import { Logger } from '@map-colonies/js-logger';
-import { DependencyContainer } from 'tsyringe';
-import { ExitCodes, EXIT_CODE, ON_SIGNAL, SERVICES } from './common/constants';
+import type { Logger } from '@map-colonies/js-logger';
+import type { DependencyContainer } from 'tsyringe';
+import { ExitCodes, EXIT_CODE, ON_SIGNAL, SERVICES } from '@common/constants';
 import { getCli } from './cli';
 
 let depContainer: DependencyContainer | undefined;
