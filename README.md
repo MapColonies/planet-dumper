@@ -22,13 +22,19 @@ index.js create
 Creates a pbf dump from an osm database, uploads it to S3, and optionally registers it with a dump-server. Uses everything `pg_dump` does, plus `RESUME`, `INFO`, `S3_ENDPOINT`, `S3_BUCKET_NAME`, `S3_ACL`, `DUMP_SERVER_ENDPOINT`, `DUMP_SERVER_HEADERS`. `S3_ENDPOINT`/`S3_BUCKET_NAME` are required to run this command.
 
 ### schedule
-Runs the `create` or `pg_dump` pipeline repeatedly on a cron schedule, in-process (using [node-cron](https://github.com/merencia/node-cron)), instead of exiting after a single run.
+Runs the `create` or `pg_dump` pipeline repeatedly on a cron schedule, in-process (using [node-cron](https://github.com/merencia/node-cron)), instead of exiting after a single run. It also starts an HTTP server so a run can be triggered on demand, at any time, independently of the cron schedule.
 ```
 index.js schedule
 ```
-Uses everything `create`/`pg_dump` use (only the ones relevant to `TARGET` are required), plus `TARGET` (`create` or `pg_dump` — which pipeline runs on each tick), `CRON_EXPRESSION`, and `RUN_ON_INIT`.
+Uses everything `create`/`pg_dump` use (only the ones relevant to `TARGET` are required), plus `TARGET` (`create` or `pg_dump` — which pipeline runs on each cron tick), `CRON_EXPRESSION`, and `HTTP_SERVER_PORT`.
 
-A tick is skipped (with a warning logged) if the previous run is still in progress, so runs never overlap. The process shuts down gracefully on `SIGTERM`/`SIGINT`.
+A tick (or an on-demand HTTP trigger) is rejected if a run is already in progress, so runs never overlap, regardless of what triggered them. The process shuts down gracefully on `SIGTERM`/`SIGINT`.
+
+**HTTP trigger endpoints** (always both available, independent of `TARGET`):
+
+- `POST /pg_dump` — runs `pg_dump` now. No request body. Responds once the run finishes (`200` on success, `409` if a run is already in progress, `500` on failure).
+- `POST /create` — runs `create` now. Optional JSON body `{ "stateSource": "<number>" }` to pin the run to a specific known sequence number instead of the configured `STATE_SOURCE`; omit it to use the configured value. Same response codes as `/pg_dump`.
+- `GET /health` — `200` if the process is up.
 
 ## Deployment Modes
 
@@ -69,7 +75,7 @@ Optional environment variables:
 - `S3_ACL` - the canned acl policy for uploaded objects, one of `authenticated-read`/`private`/`public-read`/`public-read-write`, defaults to `private`
 - `DUMP_SERVER_ENDPOINT` - the endpoint of the dump-server (used by `create`/`schedule`)
 - `DUMP_SERVER_HEADERS` - the headers to attach to the dump-server request, as a JSON array of `key=value` strings, e.g. `["X-API-KEY=secret"]`
-- `RUN_ON_INIT` - whether `schedule` runs its pipeline once immediately at startup, in addition to the cron schedule, defaults to `false`
+- `HTTP_SERVER_PORT` - the port `schedule`'s on-demand HTTP trigger server listens on, defaults to `8080`
 
 Required if `POSTGRES_ENABLE_SSL_AUTH` is true:
 
