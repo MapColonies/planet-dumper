@@ -117,3 +117,6 @@ dist
 jest_html_reporters.html
 reports
 local*
+
+*.pbf
+API.md

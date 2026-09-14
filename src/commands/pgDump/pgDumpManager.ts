@@ -4,7 +4,8 @@ import type { Logger } from '@map-colonies/js-logger';
 import type { AxiosInstance } from 'axios';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
-import { EMPTY_STRING, PG_DUMP_DIR, SERVICES, WORKDIR } from '@common/constants';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { EMPTY_STRING, PG_DUMP_DIR, S3_REGION, SERVICES, WORKDIR } from '@common/constants';
 import { InvalidStateFileError, PgDumpError } from '@common/errors';
 import type { Executable } from '@common/types';
 import { fetchSequenceNumber, streamToString } from '@common/util';
@@ -84,8 +85,7 @@ export class PgDumpManager {
 
     this.logger.info({ msg: 'getting current state number from remote source', stateSourceUrl: stateSource });
 
-    const response = await this.axios.get<NodeJS.ReadStream>(stateSource, { responseType: 'stream' });
-    const stateContent = await streamToString(response.data);
+    const stateContent = await this.fetchStateSourceContent(stateSource);
     this.state = this.fetchSequenceNumberSafely(stateContent);
 
     this.logger.info({ msg: 'state is set to fetched remote url state', state: this.state, stateSourceUrl: stateSource });
@@ -178,5 +178,25 @@ export class PgDumpManager {
       this.logger.error({ err: error, msg: 'failed to fetch sequence number out of the state file' });
       throw new InvalidStateFileError('could not fetch sequence number out of the state file');
     }
+  }
+
+  private async fetchStateSourceContent(stateSourceUrl: string): Promise<string> {
+    const s3Endpoint = this.config.get('s3').endpoint;
+
+    if (s3Endpoint !== undefined && s3Endpoint !== EMPTY_STRING && stateSourceUrl.startsWith(s3Endpoint)) {
+      const [, bucket, ...keyParts] = new URL(stateSourceUrl).pathname.split('/');
+      const key = keyParts.join('/');
+
+      this.logger.debug({ msg: 'fetching state source from own s3 bucket', bucket, key });
+
+      const s3Client = new S3Client({ endpoint: s3Endpoint, region: S3_REGION, forcePathStyle: true });
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- s3-client object command arguments/response
+      const { Body } = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+
+      return streamToString(Body as unknown as NodeJS.ReadStream);
+    }
+
+    const response = await this.axios.get<NodeJS.ReadStream>(stateSourceUrl, { responseType: 'stream' });
+    return streamToString(response.data);
   }
 }

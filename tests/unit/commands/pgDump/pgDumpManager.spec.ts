@@ -1,6 +1,8 @@
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
+import type * as awsS3 from '@aws-sdk/client-s3';
 import nock from 'nock';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
@@ -13,10 +15,28 @@ import { buildConfig, buildFsRepository } from '@tests/fixtures';
 import type { FsRepository } from '@src/fsRepository/fsRepository';
 
 const STATE_SERVER = 'https://state.example.com';
+const S3_ENDPOINT = 'https://s3.example.com';
 
 vi.mock('@common/spawner', () => ({
   spawnChild: vi.fn(),
 }));
+
+const { s3SendMock, s3ConstructorMock } = vi.hoisted(() => ({
+  s3SendMock: vi.fn(),
+  s3ConstructorMock: vi.fn(),
+}));
+
+vi.mock('@aws-sdk/client-s3', async (importOriginal) => {
+  const actual = await importOriginal<typeof awsS3>();
+  return {
+    ...actual,
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- mocking the aws-sdk's own exported class name
+    S3Client: vi.fn().mockImplementation(function (this: unknown, options: unknown) {
+      s3ConstructorMock(options);
+      return { send: s3SendMock };
+    }),
+  };
+});
 
 const spawnChildMock = vi.mocked(spawnChild);
 
@@ -71,6 +91,21 @@ describe('PgDumpManager', () => {
         await expect(manager.getState(`${STATE_SERVER}/state.txt`)).resolves.toBe('007');
         expect(manager.state).toBe('007');
         expect(scope.isDone()).toBe(true);
+        expect(s3SendMock).not.toHaveBeenCalled();
+      });
+
+      it('fetches the state from its own s3 bucket, authenticated, when stateSource points at the configured s3 endpoint', async () => {
+        // eslint-disable-next-line @typescript-eslint/naming-convention -- s3-client object command arguments/response
+        s3SendMock.mockResolvedValue({ Body: Readable.from(['sequenceNumber=99\ntimestamp=2024-01-01T00:00:00Z\n']) });
+        const axiosInstance = buildAxios();
+        const manager = buildManager(undefined, axiosInstance);
+
+        await expect(manager.getState(`${S3_ENDPOINT}/vector-ingestion/state.txt`)).resolves.toBe('99');
+
+        expect(s3ConstructorMock).toHaveBeenCalledWith(expect.objectContaining({ endpoint: S3_ENDPOINT, forcePathStyle: true }));
+        // eslint-disable-next-line @typescript-eslint/naming-convention -- s3-client object command arguments/response
+        expect(s3SendMock).toHaveBeenCalledWith(expect.objectContaining({ input: { Bucket: 'vector-ingestion', Key: 'state.txt' } }));
+        expect(axiosInstance.get).not.toHaveBeenCalled();
       });
     });
 

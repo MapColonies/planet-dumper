@@ -69,7 +69,12 @@ Optional environment variables:
 - `NG_DUMP_MAX_CONCURRENCY` - maximum number of disk writing threads to run for *each* table
 - `HTTP_CLIENT_TIMEOUT` - http client timeout duration in ms, defaults to 1000ms
 - `STATE_SOURCE` - replication state url or a specific state number, defaults to `1`
-- `CLEANUP_MODE` - the command execution cleanup mode, one of `none`/`pre-clean-others`/`post-clean-others`/`post-clean-workdir`/`post-clean-all`, defaults to `none`
+- `CLEANUP_MODE` - the command execution cleanup mode, defaults to `none`. One of:
+  - `none` - nothing is ever cleaned up automatically.
+  - `pre-clean-others` - before the run starts, wipes everything under the workdir *except* the current state's own directory.
+  - `post-clean-others` - after a successful run, wipes everything under the workdir *except* the state that just completed.
+  - `post-clean-workdir` - after a successful `create` run, wipes the current state's entire directory (both `pg_dump` and `ng_dump` output) once it's durably uploaded to S3. No-op for the plain `pg_dump` command, since that command's only output *is* the file it just produced.
+  - `post-clean-all` - after a successful `create` run, wipes the whole workdir, every state included. No-op for the plain `pg_dump` command, for the same reason as above.
 - `RESUME` - resume an already-existing dump state (used by `create`/`schedule`), defaults to `false`
 - `INFO` - collect info on the resulting dump (used by `create`/`schedule`), defaults to `false`
 - `S3_ACL` - the canned acl policy for uploaded objects, one of `authenticated-read`/`private`/`public-read`/`public-read-write`, defaults to `private`
