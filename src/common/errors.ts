@@ -1,7 +1,10 @@
 import { ExitCodes } from './constants';
 
 export class ErrorWithExitCode extends Error {
-  public constructor(message?: string, public exitCode: number = ExitCodes.GENERAL_ERROR) {
+  public constructor(
+    message?: string,
+    public exitCode: number = ExitCodes.GENERAL_ERROR
+  ) {
     super(message);
     this.exitCode = exitCode;
     Object.setPrototypeOf(this, ErrorWithExitCode.prototype);
@@ -9,7 +12,11 @@ export class ErrorWithExitCode extends Error {
 }
 
 export class CheckError extends Error {
-  public constructor(message: string, public argument: string, public received?: unknown) {
+  public constructor(
+    message: string,
+    public argument: string,
+    public received?: unknown
+  ) {
     super(message);
     Object.setPrototypeOf(this, CheckError.prototype);
   }

@@ -1,8 +1,8 @@
-import { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { Logger } from '@map-colonies/js-logger';
+import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { Logger } from '@map-colonies/js-logger';
 import { inject } from 'tsyringe';
-import { HttpUpstreamResponseError, HttpUpstreamUnavailableError } from '../common/errors';
-import { SERVICES } from '../common/constants';
+import { HttpUpstreamResponseError, HttpUpstreamUnavailableError } from '@common/errors';
+import { SERVICES } from '@common/constants';
 
 interface ErrorResponseData {
   message: string;
@@ -19,7 +19,10 @@ export interface HttpResponse<R> {
 }
 
 export abstract class BaseClient {
-  public constructor(@inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance, @inject(SERVICES.LOGGER) public readonly logger: Logger) {}
+  public constructor(
+    @inject(SERVICES.HTTP_CLIENT) public readonly axios: AxiosInstance,
+    @inject(SERVICES.LOGGER) public readonly logger: Logger
+  ) {}
 
   public invokeHttp = async <R, D, A extends AxiosRequestArgs<D>, F extends (...args: A) => Promise<AxiosResponse<R>>, E = ErrorResponseData>(
     func: F,
@@ -27,7 +30,7 @@ export abstract class BaseClient {
   ): Promise<HttpResponse<R>> => {
     try {
       const response = await func(...args);
-      return { data: response.data, contentType: response.headers['content-type'], code: response.status };
+      return { data: response.data, contentType: response.headers['content-type'] ?? '', code: response.status };
     } catch (error) {
       const axiosError = error as AxiosError<E>;
       if (axiosError.response !== undefined) {
@@ -38,7 +41,7 @@ export abstract class BaseClient {
         throw new HttpUpstreamUnavailableError('no response received from the upstream');
       } else {
         this.logger.error({ err: axiosError, msg: 'failed to dispatch http request' });
-        throw new Error('request failed to dispatch');
+        throw new Error('request failed to dispatch', { cause: error });
       }
     }
   };

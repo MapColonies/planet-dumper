@@ -1,6 +1,6 @@
-ARG NODE_VERSION=16
+ARG NODE_VERSION=24
 
-FROM ubuntu:20.04 AS buildPlanetDumpNg
+FROM ubuntu:20.04 AS build-planet-dump-ng
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG PLANET_DUMP_NG_TAG=v1.2.7
@@ -29,7 +29,7 @@ RUN git clone -b ${PLANET_DUMP_NG_TAG} --single-branch https://github.com/zerebu
   && ./configure \
   && make
 
-FROM ubuntu:20.04 AS buildOsmium
+FROM ubuntu:20.04 AS build-osmium
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG OSMIUM_TOOL_TAG=v1.16.0
@@ -60,27 +60,27 @@ RUN git clone -b ${OSMIUM_TOOL_TAG} --single-branch https://github.com/osmcode/o
   cmake .. && \
   make
 
-FROM node:${NODE_VERSION} as buildApp
+FROM node:${NODE_VERSION} AS build-app
 
 WORKDIR /tmp/buildApp
 
 COPY ./package*.json ./
 
-RUN npm install
+RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
-FROM ubuntu:20.04 as production
+FROM ubuntu:20.04 AS production
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV workdir /app
+ENV workdir=/app
 ARG POSTGRESQL_VERSION=15
 ARG NODE_VERSION
 
 WORKDIR ${workdir}
 
-COPY --from=buildPlanetDumpNg /app/planet-dump-ng/planet-dump-ng /usr/local/bin
-COPY --from=buildOsmium /osmium-tool/build /osmium-tool/build
+COPY --from=build-planet-dump-ng /app/planet-dump-ng/planet-dump-ng /usr/local/bin
+COPY --from=build-osmium /osmium-tool/build /osmium-tool/build
 RUN ln -s /osmium-tool/build/osmium /bin/osmium
 
 RUN apt-get update \
@@ -111,9 +111,9 @@ RUN apt-get update \
 
 COPY ./package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --omit=dev --ignore-scripts
 
-COPY --from=buildApp /tmp/buildApp/dist .
+COPY --from=build-app /tmp/buildApp/dist .
 COPY ./config ./config
 COPY start.sh .
 

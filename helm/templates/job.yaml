@@ -48,8 +48,6 @@ spec:
             - configMapRef:
                 name: {{ $releaseName }}-{{ $chartName }}-configmap
             - configMapRef:
-                name: {{ $releaseName }}-{{ $chartName }}-command-options-configmap
-            - configMapRef:
                 name: {{ $releaseName }}-{{ $chartName }}-arstotzka-configmap
             {{- if and .Values.arstotzka.enabled .Values.arstotzka.networkCM }}
             - configMapRef:

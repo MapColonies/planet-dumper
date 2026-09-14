@@ -1,0 +1,23 @@
+{{- $releaseName := .Release.Name -}}
+{{- $chartName := include "planet-dumper.name" . -}}
+{{- if and (.Values.enabled) (.Values.cron.enabled) -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $releaseName }}-{{ $chartName }}
+  labels:
+    app: {{ $chartName }}
+    component: {{ $chartName }}
+    environment: {{ include "planet-dumper.environment" . }}
+    release: {{ $releaseName }}
+    {{- include "planet-dumper.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "planet-dumper.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.server.port }}
+      targetPort: http
+      protocol: TCP
+{{- end -}}

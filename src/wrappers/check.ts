@@ -1,13 +1,12 @@
-import { Arguments } from 'yargs';
-import { CheckError } from '../common/errors';
-import { ILogger } from '../common/interfaces';
+import { CheckError } from '@common/errors';
+import type { ILogger } from '@common/interfaces';
 
-export type CheckFunc<T> = (argv: Arguments<T>) => true;
+export type CheckFunc<T> = (value: T) => true;
 
 export const check = <T>(check: CheckFunc<T>, logger?: ILogger): CheckFunc<T> => {
-  const wrapper: CheckFunc<T> = (argv) => {
+  const wrapper: CheckFunc<T> = (value) => {
     try {
-      return check(argv);
+      return check(value);
     } catch (err) {
       if (err instanceof CheckError) {
         logger?.error({

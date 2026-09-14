@@ -9,15 +9,18 @@ data:
   {{- with .Values.arstotzka }}
   ARSTOTZKA_ENABLED: {{ .enabled | quote }}
   {{- if .enabled }}
-  ARSTOTZKA_SERVICES: {{ .services | quote }}
+  ARSTOTZKA_SERVICE_PG: {{ .services.planetDumperPg | quote }}
+  ARSTOTZKA_SERVICE_NG: {{ .services.planetDumperNg | quote }}
   MEDIATOR_TIMEOUT: {{ .mediator.timeout | quote }}
-  MEDIATOR_ENABLE_RETRY_STRATEGY: {{ .mediator.retryStrategy.enabled | quote }}
-  {{- if .mediator.retryStrategy.enabled }}
+  MEDIATOR_ENABLE_RETRY_STRATEGY: {{ .mediator.enableRetryStrategy | quote }}
+  {{- if .mediator.enableRetryStrategy }}
   MEDIATOR_RETRY_STRATEGY_RETRIES: {{ .mediator.retryStrategy.retries | quote }}
   MEDIATOR_RETRY_STRATEGY_SHOULD_RESET_TIMEOUT: {{ .mediator.retryStrategy.shouldResetTimeout | default false | quote }}
   MEDIATOR_RETRY_STRATEGY_IS_EXPONENTIAL: {{ .mediator.retryStrategy.isExponential | default false | quote }}
   MEDIATOR_RETRY_STRATEGY_DELAY: {{ .mediator.retryStrategy.delay | quote }}
   {{- end }}
+  MEDIATOR_ACTIONY_URL: {{ .mediator.actiony.url | quote }}
+  MEDIATOR_LOCKY_URL: {{ .mediator.locky.url | quote }}
   {{- end }}
   {{- end }}
 {{- end -}}

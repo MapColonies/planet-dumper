@@ -1,9 +1,4 @@
-import { MediatorConfig } from '@map-colonies/arstotzka-mediator';
-
-export interface IConfig {
-  get: <T>(setting: string) => T;
-  has: (setting: string) => boolean;
-}
+import type { vectorPlanetDumperV1Type } from '@map-colonies/schemas';
 
 export interface LogFn {
   (obj: unknown, msg?: string, ...args: unknown[]): void;
@@ -19,31 +14,6 @@ export interface ILogger {
   fatal?: LogFn;
 }
 
-export interface S3Config {
-  s3Endpoint: string;
-  s3BucketName: string;
-  s3Acl: string;
-}
-
-export interface PostgresConfig {
-  enableSslAuth: boolean;
-  sslPaths: { ca: string; cert: string; key: string };
-}
-
-export interface PgDumpConfig {
-  verbose: boolean;
-}
-
-export interface NgDumpConfig {
-  verbose: boolean;
-  maxConcurrency: number;
-}
-
-export interface OsmiumConfig {
-  verbose: boolean;
-  progress: boolean;
-}
-
 export interface DumpServerConfig {
   dumpServerEndpoint?: string;
   dumpServerHeaders: string[];
@@ -56,10 +26,4 @@ export interface DumpMetadata {
   sequenceNumber: number;
 }
 
-export interface ArstotzkaConfig {
-  enabled: boolean;
-  services: {
-    [key: string]: string;
-  };
-  mediator: MediatorConfig;
-}
+export type ArstotzkaConfig = vectorPlanetDumperV1Type['arstotzka'];

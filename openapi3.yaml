@@ -1,0 +1,101 @@
+openapi: 3.0.3
+info:
+  title: planet-dumper HTTP trigger API
+  version: '1.0'
+  description: >
+    On-demand trigger API exposed by the `schedule` command alongside its cron schedule.
+    Internal-only, no authentication - see API.md for full details.
+paths:
+  /health:
+    get:
+      summary: Liveness check
+      responses:
+        '200':
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /pg_dump:
+    post:
+      summary: Run pg_dump now
+      responses:
+        '200':
+          description: Run completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: completed
+        '409':
+          description: A run was already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Run failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /create:
+    post:
+      summary: Run create now
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                stateSource:
+                  type: string
+                  description: A specific numeric sequence number to dump, overriding the configured STATE_SOURCE for this one run.
+                  example: '12345'
+      responses:
+        '200':
+          description: Run completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: completed
+        '400':
+          description: stateSource was provided but isn't a valid numeric sequence number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A run was already in progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Run failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: failed
+        message:
+          type: string
