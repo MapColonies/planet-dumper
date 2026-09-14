@@ -61,7 +61,7 @@
     "swagger-ui-express": "^5.0.1",
     "tsyringe": "^4.10.0",
     "valid-url": "^1.0.9",
-    "yargs": "^17.1.0"
+    "yargs": "^18.1.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
