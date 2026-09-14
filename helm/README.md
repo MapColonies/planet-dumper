@@ -30,3 +30,50 @@ A cronjob scheduled on every interval for creating a planet dump and uploading i
 ```
 helm install -f ./helm/myvalues.yaml planet-dumper ./helm
 ```
+
+
+
+**HTTP trigger API examples**
+
+These only apply when the chart is running in `schedule` mode (`cron.enabled: true`). All three endpoints are always available together; none require authentication (see [API.md](../API.md) for the full reference). Reach them through a port-forward first:
+
+
+*Health check*
+```bash
+curl http://localhost:8080/health
+```
+Always `200` while the process is up.
+
+*Trigger `pg_dump`* — no body, uses the pod's configured `OUTPUT_FORMAT`, `STATE_SOURCE`, `CLEANUP_MODE`:
+```bash
+curl -X POST http://localhost:8080/pg_dump
+```
+
+*Trigger `create`, using the configured `stateSource`*:
+```bash
+curl -X POST http://localhost:8080/create
+```
+
+*Trigger `create`, pinned to a specific numeric state* (overrides config for just this one run):
+```bash
+curl -X POST http://localhost:8080/create \
+  -H "Content-Type: application/json" \
+  -d '{"stateSource": "12"}'
+```
+
+*Trigger `create` with an invalid `stateSource`* (confirms the validation path — anything non-numeric in the body is rejected):
+```bash
+curl -X POST http://localhost:8080/create \
+  -H "Content-Type: application/json" \
+  -d '{"stateSource": "not-a-number"}'
+```
+
+Response codes, same across `/pg_dump` and `/create`:
+
+| Status | Meaning |
+|---|---|
+| `200` | Run completed successfully |
+| `400` | (`/create` only) `stateSource` body value wasn't a plain numeric string |
+| `409` | A run (either pipeline) was already in progress — rejected |
+| `500` | Run failed — body includes the error message |
+
