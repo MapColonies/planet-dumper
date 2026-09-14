@@ -5,7 +5,6 @@ import { getTasks } from 'node-cron';
 import type * as nodeCronModule from 'node-cron';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { scheduleCommandFactory } from '@src/commands/schedule/scheduleFactory';
-import { RunInProgressError } from '@src/httpServer/httpServerFactory';
 import type * as httpServerFactoryModule from '@src/httpServer/httpServerFactory';
 import { runCreatePipeline, runPgDumpPipeline } from '@src/commands/common/pipelineRunner';
 import { terminateChildren } from '@common/spawner';
@@ -15,8 +14,8 @@ import { PgDumpManager } from '@src/commands/pgDump/pgDumpManager';
 import { buildConfig, buildCreateManager, buildLogger, buildPgDumpManager, disabledArstotzkaConfig } from '@tests/fixtures';
 
 interface CapturedTriggers {
-  runPgDump: () => Promise<void>;
-  runCreate: (stateSource?: string) => Promise<void>;
+  runPgDump: () => boolean;
+  runCreate: (stateSource?: string) => boolean;
 }
 
 // a cron expression that only fires once a year - schedule() itself is mocked below (never really ticks),
@@ -130,7 +129,7 @@ describe('scheduleCommandFactory', () => {
       // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
       const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
       await waitForArmed(logger);
-      await getCapturedTriggers()?.runPgDump();
+      getCapturedTriggers()?.runPgDump();
       await shutdown(handlerPromise);
 
       expect(runPgDumpPipelineMock).toHaveBeenCalledWith(
@@ -159,7 +158,7 @@ describe('scheduleCommandFactory', () => {
       // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
       const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
       await waitForArmed(logger);
-      await getCapturedTriggers()?.runCreate();
+      getCapturedTriggers()?.runCreate();
       await shutdown(handlerPromise);
 
       expect(runCreatePipelineMock).toHaveBeenCalledWith(
@@ -188,7 +187,7 @@ describe('scheduleCommandFactory', () => {
       // eslint-disable-next-line @typescript-eslint/naming-convention -- required by yargs' Arguments<T> shape
       const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
       await waitForArmed(logger);
-      await getCapturedTriggers()?.runCreate('999');
+      getCapturedTriggers()?.runCreate('999');
       await shutdown(handlerPromise);
 
       expect(runCreatePipelineMock).toHaveBeenCalledWith(
@@ -249,11 +248,13 @@ describe('scheduleCommandFactory', () => {
       const handlerPromise = handler({ _: [], $0: 'planet-dumper' });
       await waitForArmed(logger);
 
-      const firstRunPromise = getCapturedTriggers()?.runPgDump();
-      await expect(getCapturedTriggers()?.runCreate()).rejects.toThrow(RunInProgressError);
+      expect(getCapturedTriggers()?.runPgDump()).toBe(true);
+      expect(getCapturedTriggers()?.runCreate()).toBe(false);
 
       resolveFirstRun();
-      await firstRunPromise;
+      await vi.waitFor(() => {
+        expect(logger.info).toHaveBeenCalledWith(expect.objectContaining({ msg: 'api-triggered run finished successfully' }));
+      });
       await shutdown(handlerPromise);
     });
   });

@@ -78,6 +78,7 @@ export const buildFsRepository = (): FsRepository => ({
   listFilesInDirectory: vi.fn().mockResolvedValue([]),
   getFileSize: vi.fn().mockResolvedValue(0),
   createFileReadStream: vi.fn().mockReturnValue({}),
+  readFile: vi.fn().mockResolvedValue(''),
 });
 
 // a real, silent (enabled: false) pino instance rather than a hand-mocked object, so it satisfies

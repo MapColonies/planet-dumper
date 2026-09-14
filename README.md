@@ -32,8 +32,8 @@ A tick (or an on-demand HTTP trigger) is rejected if a run is already in progres
 
 **HTTP trigger endpoints** (always both available, independent of `TARGET`):
 
-- `POST /pg_dump` — runs `pg_dump` now. No request body. Responds once the run finishes (`200` on success, `409` if a run is already in progress, `500` on failure).
-- `POST /create` — runs `create` now. Optional JSON body `{ "stateSource": "<number>" }` to pin the run to a specific known sequence number instead of the configured `STATE_SOURCE`; omit it to use the configured value. Same response codes as `/pg_dump`.
+- `POST /pg_dump` — starts `pg_dump` now. No request body. Responds immediately once the run has started, without waiting for it to finish (`202` accepted, `409` if a run is already in progress); the pipeline keeps running in the background and its actual outcome is only observable through the logs.
+- `POST /create` — starts `create` now. Optional JSON body `{ "stateSource": "<number>" }` to pin the run to a specific known sequence number instead of the configured `STATE_SOURCE`; omit it to use the configured value. Same response codes as `/pg_dump`, plus `400` if `stateSource` was provided but isn't a valid numeric sequence number.
 - `GET /health` — `200` if the process is up.
 
 ## Deployment Modes

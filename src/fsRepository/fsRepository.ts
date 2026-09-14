@@ -1,6 +1,6 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import type { ReadStream } from 'node:fs';
-import { mkdir, readdir, stat, rm } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { injectable } from 'tsyringe';
 import { NOT_FOUND_INDEX } from '@common/constants';
@@ -51,5 +51,9 @@ export class FsRepository {
 
   public createFileReadStream(this: void, path: string): ReadStream {
     return createReadStream(path);
+  }
+
+  public async readFile(this: void, path: string): Promise<string> {
+    return readFile(path, 'utf8');
   }
 }

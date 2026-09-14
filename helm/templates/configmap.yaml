@@ -13,7 +13,9 @@ data:
   PGDATABASE: {{ .database }}
   POSTGRES_ENABLE_SSL_AUTH: {{ .sslAuth.enabled | quote }}
   {{- if .sslAuth.enabled }}
-  POSTGRES_CERTS_MOUNT_PATH: {{ .sslAuth.mountPath | quote }}
+  POSTGRES_CA_PATH: {{ printf "%s/%s" .sslAuth.mountPath .sslAuth.caFileName | quote }}
+  POSTGRES_CERT_PATH: {{ printf "%s/%s" .sslAuth.mountPath .sslAuth.certFileName | quote }}
+  POSTGRES_KEY_PATH: {{ printf "%s/%s" .sslAuth.mountPath .sslAuth.keyFileName | quote }}
   {{- end }}
   {{- end }}
   LOG_LEVEL: {{ .Values.env.logLevel | quote }}

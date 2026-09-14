@@ -1,14 +1,17 @@
+import { join } from 'node:path';
 import type { CommandModule } from 'yargs';
 import type { Logger } from '@map-colonies/js-logger';
 import type { FactoryFunction } from 'tsyringe';
 import { container } from 'tsyringe';
 import { schedule as cronSchedule } from 'node-cron';
+import { load as loadYaml } from 'js-yaml';
 import { ExitCodes, EXIT_CODE, SERVICES } from '@common/constants';
 import { ErrorWithExitCode, CheckError } from '@common/errors';
 import type { ArstotzkaConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { terminateChildren } from '@common/spawner';
 import { httpServerFactory, RunInProgressError } from '@src/httpServer/httpServerFactory';
+import { FsRepository } from '@src/fsRepository/fsRepository';
 import { s3ConfigCheck, stateSourceCheck } from '../common/checks';
 import type { CreatePipelineArgs, PgDumpPipelineArgs } from '../common/pipelineRunner';
 import { runCreatePipeline, runPgDumpPipeline } from '../common/pipelineRunner';
@@ -17,6 +20,17 @@ import { PgDumpManager } from '../pgDump/pgDumpManager';
 import { cronExpressionCheck } from './checks';
 
 const DEFAULT_HTTP_SERVER_PORT = 8080;
+const OPENAPI_SPEC_FILENAME = 'openapi3.yaml';
+
+const loadOpenApiSpec = async (fsRepository: FsRepository, logger: Logger): Promise<object | undefined> => {
+  try {
+    const content = await fsRepository.readFile(join(process.cwd(), OPENAPI_SPEC_FILENAME));
+    return loadYaml(content) as object;
+  } catch (error) {
+    logger.warn({ err: error, msg: 'failed to load openapi spec, /docs will not be served', file: OPENAPI_SPEC_FILENAME });
+    return undefined;
+  }
+};
 
 export const SCHEDULE_COMMAND_FACTORY = Symbol('ScheduleCommandFactory');
 
@@ -91,6 +105,27 @@ export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependenc
         }
       };
 
+      const triggerViaApi = (runTarget: 'create' | 'pg_dump', stateSourceOverride?: string): boolean => {
+        if (isRunInProgress) {
+          return false;
+        }
+        isRunInProgress = true;
+
+        void runPipeline(runTarget, stateSourceOverride)
+          .then(() => {
+            logger.info({ msg: 'api-triggered run finished successfully', command, target: runTarget });
+          })
+          .catch((error: unknown) => {
+            terminateChildren();
+            logger.error({ err: error, msg: 'api-triggered run failed', command, target: runTarget });
+          })
+          .finally(() => {
+            isRunInProgress = false;
+          });
+
+        return true;
+      };
+
       const cronTick = async (): Promise<void> => {
         try {
           await guardedRunPipeline(target);
@@ -108,11 +143,17 @@ export const scheduleCommandFactory: FactoryFunction<CommandModule> = (dependenc
         logger.warn({ msg: 'skipped scheduled tick because the previous run is still in-flight', command, target });
       });
 
+      const openApiSpec = await loadOpenApiSpec(dependencyContainer.resolve(FsRepository), logger);
+
       const httpServerPort = Number(process.env.HTTP_SERVER_PORT ?? DEFAULT_HTTP_SERVER_PORT);
-      const httpServer = httpServerFactory(logger, {
-        runPgDump: async () => guardedRunPipeline('pg_dump'),
-        runCreate: async (stateSourceOverride) => guardedRunPipeline('create', stateSourceOverride),
-      }).listen(httpServerPort, () => {
+      const httpServer = httpServerFactory(
+        logger,
+        {
+          runPgDump: () => triggerViaApi('pg_dump'),
+          runCreate: (stateSourceOverride) => triggerViaApi('create', stateSourceOverride),
+        },
+        openApiSpec
+      ).listen(httpServerPort, () => {
         logger.info({ msg: 'http trigger server listening', port: httpServerPort });
       });
 
