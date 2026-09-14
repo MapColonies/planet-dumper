@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.0.1](https://github.com/MapColonies/planet-dumper/compare/v7.0.0...v7.0.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* fix ci builds ([f3d7ddd](https://github.com/MapColonies/planet-dumper/commit/f3d7ddd398de89b8841e83bcad0879264297dc0a))
+* fix ci builds (MAPCO-10228) ([4cd4523](https://github.com/MapColonies/planet-dumper/commit/4cd4523f144ab5486df2d3168a0fb728698ad06c))
+
 ## [7.0.0](https://github.com/MapColonies/planet-dumper/compare/v6.1.0...v7.0.0) (2026-09-14)
 
 
