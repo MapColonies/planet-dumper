@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.0.0](https://github.com/MapColonies/planet-dumper/compare/v6.1.0...v7.0.0) (2026-09-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* Create cron-node (MAPCO-10228) ([#41](https://github.com/MapColonies/planet-dumper/issues/41))
+
+### Code Refactoring
+
+* Create cron-node (MAPCO-10228) ([#41](https://github.com/MapColonies/planet-dumper/issues/41)) ([5da1a6e](https://github.com/MapColonies/planet-dumper/commit/5da1a6e597f3a21471c6fcc5e95a39562297a81e))
+
 ## [6.1.0](https://github.com/MapColonies/planet-dumper/compare/v6.0.0...v6.1.0) (2025-08-24)
 
 

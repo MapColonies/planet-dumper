@@ -2,8 +2,8 @@ apiVersion: v2
 name: planet-dumper
 description: A Helm chart for planet-dumper cron
 type: application
-version: 4.0.0
-appVersion: 4.0.0
+version: 7.0.0
+appVersion: 7.0.0
 dependencies:
   - name: mclabels
     version: 1.0.1
