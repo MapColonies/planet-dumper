@@ -5,7 +5,7 @@ import type { AxiosInstance } from 'axios';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
 import { ActionStatus } from '@map-colonies/arstotzka-common';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
-import { EMPTY_STRING, PG_DUMP_DIR, S3_REGION, SERVICES, WORKDIR } from '@common/constants';
+import { DEFAULT_EXCLUDED_SCHEMAS, EMPTY_STRING, EXCLUDED_SCHEMAS_SEPARATOR, PG_DUMP_DIR, S3_REGION, SERVICES, WORKDIR } from '@common/constants';
 import { InvalidStateFileError, PgDumpError } from '@common/errors';
 import type { Executable } from '@common/types';
 import { fetchSequenceNumber, streamToString } from '@common/util';
@@ -150,14 +150,35 @@ export class PgDumpManager {
       pgDumpGlobalArgs.push('--verbose');
     }
 
+    this.resolveExcludedSchemas().forEach((schema) => pgDumpGlobalArgs.push(`--exclude-schema=${schema}`));
+
     const postgresConfig = config.get('postgres');
     if (postgresConfig.enableSslAuth) {
       const { cert, key, ca } = postgresConfig.sslPaths;
 
-      pgDumpGlobalArgs.push(`sslcert=${cert}`);
-      pgDumpGlobalArgs.push(`sslkey=${key}`);
-      pgDumpGlobalArgs.push(`sslrootcert=${ca}`);
+      process.env.PGSSLCERT = cert;
+      process.env.PGSSLKEY = key;
+
+      if (ca !== EMPTY_STRING) {
+        process.env.PGSSLROOTCERT = ca;
+        process.env.PGSSLMODE ??= 'verify-ca';
+      } else {
+        process.env.PGSSLMODE ??= 'require';
+      }
     }
+  }
+
+  private resolveExcludedSchemas(): string[] {
+    const configured = process.env.PG_DUMP_EXCLUDE_SCHEMAS;
+
+    if (configured === undefined) {
+      return DEFAULT_EXCLUDED_SCHEMAS;
+    }
+
+    return configured
+      .split(EXCLUDED_SCHEMAS_SEPARATOR)
+      .map((schema) => schema.trim())
+      .filter((schema) => schema !== EMPTY_STRING);
   }
 
   private async executePgDump(pgDumpOutputPath: string): Promise<void> {

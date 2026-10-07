@@ -57,6 +57,9 @@ env:
     timeout: 1000
   pgDump:
     verbose: false
+    excludeSchemas:
+      - tiger
+      - tiger_data
   ngDump:
     verbose: false
     maxConcurrency: 16
