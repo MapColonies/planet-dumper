@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.0.2](https://github.com/MapColonies/planet-dumper/compare/v7.0.1...v7.0.2) (2026-10-07)
+
+
+### Bug Fixes
+
+* ssl auth ([#59](https://github.com/MapColonies/planet-dumper/issues/59)) ([17f23ca](https://github.com/MapColonies/planet-dumper/commit/17f23cab3e507c1172e3d801a3cb8fd413fc5c6d))
+
 ## [7.0.1](https://github.com/MapColonies/planet-dumper/compare/v7.0.0...v7.0.1) (2026-09-14)
 
 
