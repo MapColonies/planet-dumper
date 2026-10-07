@@ -18,6 +18,7 @@ Deploys either a one-shot `Job` (`pg_dump`/`create`, for manual or CI-triggered 
 - `server.port` - the `schedule` command's HTTP trigger server port (`POST /create`, `POST /pg_dump`, `GET /health`)
 - `resources.enabled` / `resources.value` - container resource requests/limits
 - `env.*` - logging, tracing, http client timeout, and `pgDump`/`ngDump`/`osmium` verbosity settings
+- `env.pgDump.excludeSchemas` - postgres schemas to keep out of the dump (`PG_DUMP_EXCLUDE_SCHEMAS`), defaults to the postgis geocoder schemas `tiger`/`tiger_data`; a schema the database does not have is ignored, and `[]` excludes nothing
 - `postgres.host` / `username` / `password` / `database` / `port` - source database connection
 - `postgres.sslAuth.enabled` - enable postgres certificate auth
 - `postgres.sslAuth.secretName` - secret mounted as the certs volume

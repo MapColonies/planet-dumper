@@ -66,6 +66,7 @@ Optional environment variables:
 
 - `POSTGRES_ENABLE_SSL_AUTH` - flag for enabling postgres certificate auth, defaults to `false`
 - `PG_DUMP_VERBOSE` - verbose flag for pg_dump defaults to false
+- `PG_DUMP_EXCLUDE_SCHEMAS` - comma separated list of postgres schemas to keep out of the dump, defaults to `tiger,tiger_data` (the postgis geocoder schemas, which are not part of an osm dump and are often owned by a role the dumping user cannot read). Set it to an empty value to exclude nothing. A listed schema that the database does not have is ignored by pg_dump
 - `NG_DUMP_MAX_CONCURRENCY` - maximum number of disk writing threads to run for *each* table
 - `HTTP_CLIENT_TIMEOUT` - http client timeout duration in ms, defaults to 1000ms
 - `STATE_SOURCE` - replication state url or a specific state number, defaults to `1`

@@ -54,14 +54,31 @@ const buildManager = (fsRepository: FsRepository = buildFsRepository(), httpClie
     fsRepository
   );
 
+// the ssl paths are applied to process.env by the constructor, so each case needs its own manager
+const buildSslManager = (config: ReturnType<typeof buildConfig>): PgDumpManager =>
+  new PgDumpManager(
+    { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), child: vi.fn().mockReturnValue({ debug: vi.fn() }) } as never,
+    config,
+    buildAxios(),
+    buildFsRepository()
+  );
+
 describe('PgDumpManager', () => {
+  const sslEnvKeys = ['PGSSLCERT', 'PGSSLKEY', 'PGSSLROOTCERT', 'PGSSLMODE', 'PG_DUMP_EXCLUDE_SCHEMAS'] as const;
+  let envBackup: NodeJS.ProcessEnv;
+
   beforeEach(() => {
     vi.clearAllMocks();
     spawnChildMock.mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' } as never);
+
+    envBackup = { ...process.env };
+    // PGSSLMODE is only set when absent, so a leaked value would mask the assertions
+    sslEnvKeys.forEach((key) => delete process.env[key]);
   });
 
   afterEach(() => {
     nock.cleanAll();
+    process.env = envBackup;
   });
 
   describe('Happy Path', () => {
@@ -213,28 +230,82 @@ describe('PgDumpManager', () => {
         );
       });
 
-      it('adds ssl args to the pg_dump invocation when postgres.enableSslAuth is enabled', async () => {
-        const config = buildConfig({
-          postgres: { enableSslAuth: true, sslPaths: { cert: 'cert.pem', key: 'key.pem', ca: 'ca.pem' } },
-        });
-        const manager = new PgDumpManager(
-          { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), child: vi.fn().mockReturnValue({ debug: vi.fn() }) } as never,
-          config,
-          buildAxios(),
-          buildFsRepository()
-        );
+      it('excludes the postgis geocoder schemas by default', async () => {
+        const manager = buildManager();
         await manager.getState('1');
 
         await manager.createPgDump('dump_{state}_{timestamp}.pbf', false);
 
         expect(spawnChildMock).toHaveBeenCalledWith(
           'pg_dump',
-          expect.arrayContaining(['sslcert=cert.pem', 'sslkey=key.pem', 'sslrootcert=ca.pem']),
+          expect.arrayContaining(['--exclude-schema=tiger', '--exclude-schema=tiger_data']),
           undefined,
           undefined,
           undefined,
           undefined
         );
+      });
+
+      it('excludes the schemas listed in PG_DUMP_EXCLUDE_SCHEMAS instead of the defaults', async () => {
+        process.env.PG_DUMP_EXCLUDE_SCHEMAS = 'topology, audit ,tiger';
+        const manager = buildManager();
+        await manager.getState('1');
+
+        await manager.createPgDump('dump_{state}_{timestamp}.pbf', false);
+
+        const [, args] = spawnChildMock.mock.calls[0] as unknown as [string, string[]];
+        expect(args).toEqual(expect.arrayContaining(['--exclude-schema=topology', '--exclude-schema=audit', '--exclude-schema=tiger']));
+        expect(args).not.toContain('--exclude-schema=tiger_data');
+      });
+
+      it('excludes nothing when PG_DUMP_EXCLUDE_SCHEMAS is set but empty', async () => {
+        process.env.PG_DUMP_EXCLUDE_SCHEMAS = '';
+        const manager = buildManager();
+        await manager.getState('1');
+
+        await manager.createPgDump('dump_{state}_{timestamp}.pbf', false);
+
+        const [, args] = spawnChildMock.mock.calls[0] as unknown as [string, string[]];
+        expect(args.some((arg) => arg.startsWith('--exclude-schema='))).toBe(false);
+      });
+
+      it('exposes the ssl paths as libpq environment variables when postgres.enableSslAuth is enabled', () => {
+        const config = buildConfig({
+          postgres: { enableSslAuth: true, sslPaths: { cert: 'cert.pem', key: 'key.pem', ca: 'ca.pem' } },
+        });
+
+        buildSslManager(config);
+
+        expect(process.env.PGSSLCERT).toBe('cert.pem');
+        expect(process.env.PGSSLKEY).toBe('key.pem');
+        expect(process.env.PGSSLROOTCERT).toBe('ca.pem');
+        expect(process.env.PGSSLMODE).toBe('verify-ca');
+      });
+
+      it('requires encryption without verification when no ca is configured', () => {
+        const config = buildConfig({
+          postgres: { enableSslAuth: true, sslPaths: { cert: 'cert.pem', key: 'key.pem', ca: '' } },
+        });
+
+        buildSslManager(config);
+
+        expect(process.env.PGSSLCERT).toBe('cert.pem');
+        expect(process.env.PGSSLKEY).toBe('key.pem');
+        expect(process.env.PGSSLROOTCERT).toBeUndefined();
+        expect(process.env.PGSSLMODE).toBe('require');
+      });
+
+      it('never puts the ssl paths on the pg_dump command line', async () => {
+        const config = buildConfig({
+          postgres: { enableSslAuth: true, sslPaths: { cert: 'cert.pem', key: 'key.pem', ca: 'ca.pem' } },
+        });
+        const manager = buildSslManager(config);
+        await manager.getState('1');
+
+        await manager.createPgDump('dump_{state}_{timestamp}.pbf', false);
+
+        const [, args] = spawnChildMock.mock.calls[0] as unknown as [string, string[]];
+        expect(args.some((arg) => arg.includes('sslcert=') || arg.includes('sslkey=') || arg.includes('sslrootcert='))).toBe(false);
       });
     });
   });
