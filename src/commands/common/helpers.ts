@@ -5,10 +5,6 @@ export const nameFormat = (format: string, timestamp: Date, state?: string): str
   return stringFormat(format, { timestamp: timestamp.toISOString(), state });
 };
 
-/**
- * The name of the history dump written next to a dump: its .pbf suffix
- * becomes .osh.pbf, the suffix osmium and osm2pgsql read as history.
- */
 export const historyDumpName = (name: string): string => {
   return `${name.replace(/\.pbf$/, '')}.osh.pbf`;
 };

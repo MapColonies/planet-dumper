@@ -101,8 +101,6 @@ export const runCreatePipeline = async (
 
     await manager.uploadDumpToS3(ngDumpFilePath, s3BucketName, metadata.name, s3Acl);
 
-    // The history dump is not registered on the dump server, so nothing
-    // that asks it for the latest dump can pick it up by mistake.
     const historyDumpFilePath = manager.historyDumpPath(ngDumpFilePath);
     if (historyDumpFilePath !== undefined) {
       await manager.uploadDumpToS3(historyDumpFilePath, s3BucketName, historyDumpName(metadata.name), s3Acl);

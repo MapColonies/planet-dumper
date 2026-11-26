@@ -92,10 +92,6 @@ export class CreateManager extends PgDumpManager {
     await this.commandWrapper(executable, args, PlanetDumpNgError, undefined, dirname(ngDumpFilePath), isVerbose);
   }
 
-  /**
-   * The path of the history dump planet-dump-ng writes next to the dump, or
-   * undefined when ngDump.historyPbf is off.
-   */
   public historyDumpPath(ngDumpFilePath: string): string | undefined {
     if (!this.config.get('ngDump').historyPbf) {
       return undefined;
