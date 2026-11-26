@@ -1,12 +1,12 @@
 import { isWebUri } from 'valid-url';
-import type { vectorPlanetDumperV1Type } from '@map-colonies/schemas';
+import type { vectorPlanetDumperV2Type } from '@map-colonies/schemas';
 import { CheckError } from '@common/errors';
 import type { CheckFunc } from '@src/wrappers/check';
 
 const STATE_SOURCE_CHECK_ARG = 'cli.stateSource';
 const S3_CHECK_ARG = 's3';
 
-type S3Config = vectorPlanetDumperV1Type['s3'];
+type S3Config = vectorPlanetDumperV2Type['s3'];
 type ConfiguredS3Config = S3Config & { endpoint: string; bucketName: string };
 
 export const stateSourceCheck: CheckFunc<string> = (stateSource) => {

@@ -1,4 +1,4 @@
-import type { vectorPlanetDumperV1Type } from '@map-colonies/schemas';
+import type { vectorPlanetDumperV2Type } from '@map-colonies/schemas';
 
 export interface LogFn {
   (obj: unknown, msg?: string, ...args: unknown[]): void;
@@ -26,4 +26,4 @@ export interface DumpMetadata {
   sequenceNumber: number;
 }
 
-export type ArstotzkaConfig = vectorPlanetDumperV1Type['arstotzka'];
+export type ArstotzkaConfig = vectorPlanetDumperV2Type['arstotzka'];
