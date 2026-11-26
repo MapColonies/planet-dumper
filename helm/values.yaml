@@ -63,6 +63,10 @@ env:
   ngDump:
     verbose: false
     maxConcurrency: 16
+    # also write a history pbf (every version of every object) next to the
+    # regular pbf, for osm2pgsql --create --history. It is uploaded to the
+    # same bucket but not registered on the dump server.
+    historyPbf: false
   osmium:
     verbose: false
     progress: false

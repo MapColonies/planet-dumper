@@ -30,6 +30,7 @@ data:
   PG_DUMP_EXCLUDE_SCHEMAS: {{ join "," (.Values.env.pgDump.excludeSchemas | default list) | quote }}
   NG_DUMP_VERBOSE: {{ .Values.env.ngDump.verbose | quote }}
   NG_DUMP_MAX_CONCURRENCY: {{ .Values.env.ngDump.maxConcurrency | quote }}
+  NG_DUMP_HISTORY_PBF: {{ .Values.env.ngDump.historyPbf | quote }}
   OSMIUM_VERBOSE: {{ .Values.env.osmium.verbose | quote }}
   OSMIUM_PROGRESS: {{ .Values.env.osmium.progress | quote }}
   {{- with .Values.s3 }}

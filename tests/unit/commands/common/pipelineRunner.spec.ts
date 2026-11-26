@@ -163,6 +163,35 @@ describe('pipelineRunner', () => {
         );
       });
 
+      it('uploads the history pbf next to the regular pbf without registering it', async () => {
+        const { manager } = buildManager();
+        const { uploadDumpToS3, registerOnDumpServer } = stubHappyPath(manager);
+        vi.spyOn(manager, 'historyDumpPath').mockReturnValue('/workdir/1/ng_dump/dump.osh.pbf');
+
+        await runCreatePipeline(manager, buildArgs({ dumpServerEndpoint: 'https://dump-server.example.com' }), logger, disabledArstotzkaConfig);
+
+        expect(uploadDumpToS3).toHaveBeenCalledTimes(2);
+        const regularKey = uploadDumpToS3.mock.calls[0]?.[2];
+        expect(uploadDumpToS3).toHaveBeenNthCalledWith(
+          2,
+          '/workdir/1/ng_dump/dump.osh.pbf',
+          'bucket',
+          regularKey?.replace(/\.pbf$/, '.osh.pbf'),
+          'private'
+        );
+        expect(registerOnDumpServer).toHaveBeenCalledTimes(1);
+        expect(registerOnDumpServer).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ name: regularKey }));
+      });
+
+      it('uploads only the regular pbf when no history pbf is written', async () => {
+        const { manager } = buildManager();
+        const { uploadDumpToS3 } = stubHappyPath(manager);
+
+        await runCreatePipeline(manager, buildArgs(), logger, disabledArstotzkaConfig);
+
+        expect(uploadDumpToS3).toHaveBeenCalledTimes(1);
+      });
+
       it("empties only the current state's workdir when cleanupMode is post-clean-workdir", async () => {
         const { manager, fsRepository } = buildManager();
         stubHappyPath(manager);

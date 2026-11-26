@@ -1,4 +1,4 @@
-import { join, dirname } from 'node:path';
+import { basename, join, dirname } from 'node:path';
 import { inject, injectable } from 'tsyringe';
 import type { Logger } from '@map-colonies/js-logger';
 import { StatefulMediator } from '@map-colonies/arstotzka-mediator';
@@ -12,7 +12,7 @@ import type { DumpMetadata, DumpServerConfig } from '@common/interfaces';
 import type { ConfigType } from '@common/config';
 import { Executable } from '@common/types';
 import { PgDumpManager } from '../pgDump/pgDumpManager';
-import { nameFormat } from '../common/helpers';
+import { historyDumpName, nameFormat } from '../common/helpers';
 import type { CleanupMode } from '../common/types';
 
 export interface S3Uploader {
@@ -80,11 +80,27 @@ export class CreateManager extends PgDumpManager {
     const args = [...globalArgs, `--dump-file=${pgDumpFilePath}`, `--pbf=${ngDumpFilePath}`];
     const isVerbose = this.config.get('ngDump.verbose');
 
+    const historyDumpFilePath = this.historyDumpPath(ngDumpFilePath);
+    if (historyDumpFilePath !== undefined) {
+      args.push(`--history-pbf=${historyDumpFilePath}`);
+    }
+
     if (shouldResume === true) {
       args.push('--resume');
     }
 
     await this.commandWrapper(executable, args, PlanetDumpNgError, undefined, dirname(ngDumpFilePath), isVerbose);
+  }
+
+  /**
+   * The path of the history dump planet-dump-ng writes next to the dump, or
+   * undefined when ngDump.historyPbf is off.
+   */
+  public historyDumpPath(ngDumpFilePath: string): string | undefined {
+    if (!this.config.get('ngDump').historyPbf) {
+      return undefined;
+    }
+    return join(dirname(ngDumpFilePath), historyDumpName(basename(ngDumpFilePath)));
   }
 
   public async executeOsmium(ngDumpFilePath: string): Promise<string> {

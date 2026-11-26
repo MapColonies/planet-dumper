@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nameFormat, buildDumpMetadata } from '@src/commands/common/helpers';
+import { nameFormat, buildDumpMetadata, historyDumpName } from '@src/commands/common/helpers';
 
 describe('helpers', () => {
   const timestamp = new Date('2024-01-01T00:00:00.000Z');
@@ -27,6 +27,16 @@ describe('helpers', () => {
         timestamp,
         sequenceNumber: 42,
       });
+    });
+  });
+
+  describe('#historyDumpName', () => {
+    it('replaces a .pbf suffix with .osh.pbf', () => {
+      expect(historyDumpName('dump_42_2024.pbf')).toBe('dump_42_2024.osh.pbf');
+    });
+
+    it('appends .osh.pbf to a name without a .pbf suffix', () => {
+      expect(historyDumpName('dump_42_2024')).toBe('dump_42_2024.osh.pbf');
     });
   });
 });

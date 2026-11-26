@@ -197,6 +197,43 @@ describe('CreateManager', () => {
         );
       });
 
+      it('adds --history-pbf next to the regular pbf when ngDump.historyPbf is set', async () => {
+        const config = buildConfig({ ngDump: { historyPbf: true }, osmium: {} });
+        const manager = buildManager(undefined, undefined, config);
+        await manager.getState('1');
+
+        const path = await manager.createNgDump('dump_{state}_{timestamp}.pbf', '/workdir/1/pg_dump/dump.dmp', false, false);
+
+        const historyPath = path.replace(/\.pbf$/, '.osh.pbf');
+        expect(manager.historyDumpPath(path)).toBe(historyPath);
+        expect(spawnChildMock).toHaveBeenCalledWith(
+          'planet-dump-ng',
+          expect.arrayContaining([`--pbf=${path}`, `--history-pbf=${historyPath}`]),
+          undefined,
+          expect.any(String),
+          undefined,
+          undefined
+        );
+      });
+
+      it('does not write a history pbf when ngDump.historyPbf is not set', async () => {
+        const config = buildConfig({ ngDump: {}, osmium: {} });
+        const manager = buildManager(undefined, undefined, config);
+        await manager.getState('1');
+
+        const path = await manager.createNgDump('dump_{state}_{timestamp}.pbf', '/workdir/1/pg_dump/dump.dmp', false, false);
+
+        expect(manager.historyDumpPath(path)).toBeUndefined();
+        expect(spawnChildMock).toHaveBeenCalledWith(
+          'planet-dump-ng',
+          expect.not.arrayContaining([expect.stringContaining('--history-pbf')]),
+          undefined,
+          expect.any(String),
+          undefined,
+          undefined
+        );
+      });
+
       it('adds --progress or --no-progress and --verbose to the osmium invocation based on config', async () => {
         const config = buildConfig({ osmium: { verbose: true, progress: true }, ngDump: {} });
         const manager = buildManager(undefined, undefined, config);
