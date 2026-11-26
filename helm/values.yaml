@@ -63,6 +63,7 @@ env:
   ngDump:
     verbose: false
     maxConcurrency: 16
+    historyPbf: false
   osmium:
     verbose: false
     progress: false

@@ -5,7 +5,7 @@ import { ActionStatus } from '@map-colonies/arstotzka-common';
 import type { ArstotzkaConfig } from '@common/interfaces';
 import type { PgDumpManager } from '../pgDump/pgDumpManager';
 import type { CreateManager } from '../create/createManager';
-import { buildDumpMetadata } from './helpers';
+import { buildDumpMetadata, historyDumpName } from './helpers';
 import type { CleanupMode } from './types';
 
 const buildMediatorConfig = (mediator: Extract<ArstotzkaConfig, { enabled: true }>['mediator']): MediatorConfig => {
@@ -100,6 +100,11 @@ export const runCreatePipeline = async (
     const metadata = buildDumpMetadata(outputFormat, manager.timestamp, state);
 
     await manager.uploadDumpToS3(ngDumpFilePath, s3BucketName, metadata.name, s3Acl);
+
+    const historyDumpFilePath = manager.historyDumpPath(ngDumpFilePath);
+    if (historyDumpFilePath !== undefined) {
+      await manager.uploadDumpToS3(historyDumpFilePath, s3BucketName, historyDumpName(metadata.name), s3Acl);
+    }
 
     if (dumpServerEndpoint !== undefined) {
       await manager.registerOnDumpServer({ dumpServerEndpoint, dumpServerHeaders }, { ...metadata, bucket: s3BucketName });

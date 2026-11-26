@@ -1,7 +1,7 @@
 import { type ConfigInstance, config } from '@map-colonies/config';
-import { vectorPlanetDumperV1, type vectorPlanetDumperV1Type } from '@map-colonies/schemas';
+import { vectorPlanetDumperV2, type vectorPlanetDumperV2Type } from '@map-colonies/schemas';
 
-type ConfigType = ConfigInstance<vectorPlanetDumperV1Type>;
+type ConfigType = ConfigInstance<vectorPlanetDumperV2Type>;
 
 let configInstance: ConfigType | undefined;
 
@@ -13,7 +13,7 @@ let configInstance: ConfigType | undefined;
  */
 export async function initConfig(offlineMode = true): Promise<void> {
   configInstance = await config({
-    schema: vectorPlanetDumperV1,
+    schema: vectorPlanetDumperV2,
     offlineMode,
   });
 }

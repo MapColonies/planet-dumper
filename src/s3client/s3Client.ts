@@ -14,7 +14,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
-import type { vectorPlanetDumperV1Type } from '@map-colonies/schemas';
+import type { vectorPlanetDumperV2Type } from '@map-colonies/schemas';
 import { S3Error } from '@common/errors';
 import { S3_NOT_FOUND_ERROR_NAME, SERVICES } from '@common/constants';
 import type { ConfigType } from '@common/config';
@@ -25,7 +25,7 @@ const BYTES_IN_MB = 1048576;
 
 @injectable()
 export class S3ClientWrapper {
-  private readonly uploadOptions: vectorPlanetDumperV1Type['s3']['upload'];
+  private readonly uploadOptions: vectorPlanetDumperV2Type['s3']['upload'];
 
   public constructor(
     @inject(SERVICES.LOGGER) private readonly logger: Logger,
